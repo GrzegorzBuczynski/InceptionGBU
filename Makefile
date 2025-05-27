@@ -14,7 +14,7 @@ CONFIG_TEMPLATE = netplan-config.yaml
 all: network install_doker
 
 
-network: configure_network apply verify setdomain
+network: configure_network verify setdomain
 
 help:
 	@echo "Użycie tego Makefile:"
@@ -28,7 +28,6 @@ help:
 
 install_docker:
 	@sudo rm -f /etc/apt/sources.list.d/docker.list
-	@sudo apt update -y
 	@echo "Installing Docker and Docker Compose..."
 	@sudo apt update -y && sudo apt upgrade -y
 	@sudo apt install -y ca-certificates curl gnupg lsb-release
@@ -90,10 +89,6 @@ setdomain:
 	@echo "2. Configure Networking"
 	echo "192.168.1.100 login.42.fr" | sudo tee -a /etc/hosts
 
-# Apply the Netplan configuration
-apply:
-	@echo "Applying network configuration..."
-	@sudo netplan apply
 
 # Verify the IP configuration
 verify:
@@ -106,5 +101,7 @@ clean:
 	@echo "Restoring DHCP configuration..."
 	@sudo sh -c "cat netplan-config_no_config.yaml > $(NETPLAN_FILE)"
 	@sudo netplan apply
+	sudo systemctl restart systemd-networkd
 
-.PHONY: all configure apply verify clean
+
+.PHONY: all configure verify clean
