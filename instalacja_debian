@@ -1,0 +1,32 @@
+
+
+po instalacji aby cokolwiek zrobić w terminalu należy zalogować sie jako root 
+su - #zaloguj sie jako root
+alternatywnie dodaj uzytkownika do grupy sudoers
+usermod -aG sudo user #dodaj do grupy user
+groups user #sprawdź czy dodano
+exit 
+sudo reboot # restartuj by przyjac nowe ustawienia
+
+
+instalacja narzedzi goscia
+sudo apt update
+sudo apt install build-essential dkms linux-headers-$(uname -r)
+sudo mkdir /mnt/cdrom
+sudo mount /dev/cdrom /mnt/cdrom
+cd /mnt/cdrom
+sudo sh ./VBox*.sh
+sudo reboot
+
+statyczne ip\
+1 zidentyfikuj network interface
+ip link
+edytuj plik 
+sudo nano /etc/network/interfaces
+# The primary network interface
+auto eth0
+iface eth0 inet static
+    address 192.168.1.100
+    netmask 255.255.255.0
+    gateway 192.168.1.1
+    dns-nameservers 8.8.8.8 8.8.4.4
