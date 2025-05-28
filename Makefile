@@ -67,9 +67,6 @@ remove-domain:
 	sudo sed -i "/$(DOMAIN_NAME)/d" $(HOSTS_FILE)
 	@echo "Domain $(DOMAIN_NAME) removed from hosts file"
 
-
-
-
 # Create backup of current network configuration
 create-backup-config:
 	@echo "Creating backup of network configuration..."
@@ -90,6 +87,20 @@ setup-static-ip:
 	-sudo ifdown $(INTERFACE) && sudo ifup $(INTERFACE) || echo "Interface restart failed"
 	@echo "Static IP configuration completed"
 
+
+restore-dhcp:
+	@echo "Restoring DHCP configuration..."
+	sed 's/enp0s3/$(INTERFACE)/g' interfaces.dhcp > interfaces.tmp
+	@echo "Generated DHCP config:"
+	@cat interfaces.tmp
+	sudo cp interfaces.tmp $(NETWORK_FILE)
+	rm interfaces.tmp
+	-sudo systemctl enable dhcpcd 2>/dev/null || true
+	-sudo systemctl start dhcpcd 2>/dev/null || true
+	@echo "Restarting networking service..."
+	-sudo systemctl restart networking || echo "Networking restart failed, trying alternative method"
+	-sudo ifdown $(INTERFACE) && sudo ifup $(INTERFACE) || echo "Interface restart failed"
+	@echo "DHCP configuration restored"
 
 # Restore network configuration from backup
 restore-ip-config:
