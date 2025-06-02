@@ -18,4 +18,7 @@ fclean: clean
 
 re: fclean all
 
+logs:
+	docker-compose log
+
 .PHONY: all up down clean fclean re
