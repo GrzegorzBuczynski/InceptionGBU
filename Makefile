@@ -12,6 +12,11 @@ DNS2 ?= 8.8.4.4
 NETWORK_FILE = /etc/network/interfaces
 BACKUP_FILE = /etc/network/interfaces.backup
 
+# Domain configuration variables
+DOMAIN_IP ?= 192.168.1.100
+DOMAIN_NAME ?= login.42.fr
+HOSTS_FILE = /etc/hosts
+
 install_docker2: 
 	@sudo apt update && sudo apt install -y docker.io docker-compose
 	@sudo systemctl start docker
@@ -44,12 +49,6 @@ docker:
 	@sudo systemctl enable docker
 	@sudo docker --version
 	@sudo usermod -aG docker $$USER
-
-
-# Domain configuration variables
-DOMAIN_IP ?= 192.168.1.100
-DOMAIN_NAME ?= login.42.fr
-HOSTS_FILE = /etc/hosts
 
 # Setup local domain mapping
 setup-domain:
@@ -113,3 +112,17 @@ restore-ip-config:
 		echo "Error: Backup file $(BACKUP_FILE) not found"; \
 		exit 1; \
 	fi
+
+create_dir_structure:
+	mkdir -p inception/srcs/requirements/nginx/conf
+	mkdir -p inception/srcs/requirements/nginx/tools
+	mkdir -p inception/srcs/requirements/wordpress/conf
+	mkdir -p inception/srcs/requirements/wordpress/tools
+	mkdir -p inception/srcs/requirements/mariadb/conf
+	mkdir -p inception/srcs/requirements/mariadb/tools
+	mkdir -p inception/secrets
+	touch inception/Makefile
+	touch inception/srcs/docker-compose.yml
+	touch inception/srcs/.env
+
+
