@@ -4,6 +4,18 @@ all: up
 up:
 	mkdir -p /home/${USER}/data/mariadb
 	mkdir -p /home/${USER}/data/wordpress
+	sudo chown -R 999:999 /home/${USER}/data/mariadb
+	sudo chown -R www-data:www-data /home/${USER}/data/wordpress
+	@if [ ! -f .env ]; then \
+		if [ -f .env.example ]; then \
+			echo "Copying .env.example to .env..."; \
+			cp .env.example .env; \
+		else \
+			echo "Warning: .env.example not found!"; \
+		fi; \
+	else \
+		echo ".env already exists"; \
+	fi
 	docker-compose -f srcs/docker-compose.yml up -d --build
 
 down:
