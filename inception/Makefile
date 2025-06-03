@@ -7,11 +7,11 @@ up:
 	sudo chown -R 999:999 /home/${USER}/data/mariadb
 	sudo chown -R www-data:www-data /home/${USER}/data/wordpress
 	@if [ ! -f .env ]; then \
-		if [ -f .env.example ]; then \
-			echo "Copying .env.example to .env..."; \
-			cp .env.example .env; \
+		if [ -f srcs/.env.example ]; then \
+			echo "Copying srcs/.env.example to srcs/.env..."; \
+			cp srcs/.env.example srcs/.env; \
 		else \
-			echo "Warning: .env.example not found!"; \
+			echo "Warning: srcs/.env.example not found!"; \
 		fi; \
 	else \
 		echo ".env already exists"; \
