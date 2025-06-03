@@ -1,0 +1,103 @@
+Tak, jako użytkownik możesz wchodzić w interakcję z sieciami Docker na kilka sposobów:
+
+## 1. Podłączanie się do działających kontenerów
+
+```bash
+# Wejście do kontenera w sieci inception_network
+docker exec -it <container_name> bash
+
+# Przykład - wejście do nginx
+docker exec -it nginx bash
+
+# Teraz jesteś wewnątrz kontenera i możesz:
+ping wordpress    # pingować inne kontenery w tej sieci
+curl wordpress:80 # łączyć się z innymi serwisami
+```
+
+## 2. Tworzenie tymczasowego kontenera w sieci
+
+```bash
+# Uruchom kontener Alpine w konkretnej sieci
+docker run -it --network inception_network alpine sh
+
+# Lub używając docker-compose
+docker run -it --network srcs_inception_network alpine sh
+```
+
+## 3. Inspekcja sieci
+
+```bash
+# Lista wszystkich sieci
+docker network ls
+
+# Szczegóły konkretnej sieci
+docker network inspect inception_network
+
+# Zobacz które kontenery są podłączone
+docker network inspect inception_network | grep -A 10 "Containers"
+```
+
+## 4. Mapowanie portów na host
+
+```yaml
+services:
+  nginx:
+    build: ./nginx
+    ports:
+      - "80:80"     # port hosta:port kontenera
+      - "443:443"
+    networks:
+      - inception_network
+```
+
+Teraz możesz:
+```bash
+# Dostęp z przeglądarki
+http://localhost
+
+# Lub curl z hosta
+curl http://localhost
+```
+
+## 5. Podłączanie istniejącego kontenera do sieci
+
+```bash
+# Podłącz kontener do dodatkowej sieci
+docker network connect database_network existing_container
+
+# Odłącz kontener od sieci  
+docker network disconnect inception_network existing_container
+```
+
+## 6. Debugowanie połączeń
+
+```bash
+# Sprawdź które porty są otwarte w kontenerze
+docker exec -it nginx netstat -tlnp
+
+# Sprawdź routing
+docker exec -it nginx ip route
+
+# Test połączenia między kontenerami
+docker exec -it nginx telnet wordpress 3306
+```
+
+## Przykład praktyczny - debugowanie:
+
+```bash
+# 1. Sprawdź czy sieć istnieje
+docker network ls | grep inception
+
+# 2. Zobacz szczegóły sieci
+docker network inspect inception_network
+
+# 3. Wejdź do kontenera
+docker exec -it nginx bash
+
+# 4. Testuj połączenia wewnątrz kontenera
+ping mariadb
+curl wordpress:9000
+nslookup wordpress
+```
+
+Sieci Docker są więc bardzo interaktywne - możesz je monitorować, debugować i zarządzać nimi z poziomu hosta oraz z wnętrza kontenerów.
