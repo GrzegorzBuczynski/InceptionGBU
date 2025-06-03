@@ -21,4 +21,13 @@ re: fclean all
 logs:
 	docker-compose log
 
+images:
+	docker images
+
+status:
+	docker-compose -f srcs/docker-compose.yml ps
+
+volumes:
+	docker volume ls
+
 .PHONY: all up down clean fclean re
