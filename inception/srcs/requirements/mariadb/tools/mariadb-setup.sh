@@ -8,6 +8,11 @@ log() {
 
 log "Starting MariaDB setup..."
 
+MYSQL_ROOT_PASSWORD=$(cat /run/secrets/mysql_root_password)
+MYSQL_DATABASE=$(cat /run/secrets/mysql_database)
+MYSQL_USER=$(cat /run/secrets/mysql_user)
+MYSQL_PASSWORD=$(cat /run/secrets/mysql_password)
+
 # Sprawdź czy baza danych nie jest już zainicjowana
 if [ ! -f "/var/lib/mysql/.wordpress_initialized" ]; then
     log "Initializing MariaDB database..."
