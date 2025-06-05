@@ -45,6 +45,11 @@ polacz_nginx:
 volumes:
 	docker volume ls
 
+# Sprawdź czy nginx używa odpowiednich wersji TLS
+docker_encryption:
+	docker exec nginx nginx -T | grep ssl_protocols
+	docker exec nginx nginx -T | grep ssl_protocols
+
 .PHONY: all up down clean fclean re
 
 

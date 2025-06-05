@@ -8,6 +8,16 @@ log() {
 
 log "Starting WordPress setup..."
 
+export WORDPRESS_DB_NAME=$(cat /run/secrets/mysql_database)
+export WORDPRESS_DB_USER=$(cat /run/secrets/mysql_user)  
+export WORDPRESS_DB_PASSWORD=$(cat /run/secrets/mysql_password)
+export WP_ADMIN_PASSWORD=$(cat /run/secrets/wp_admin_password)
+export WP_USER_PASSWORD=$(cat /run/secrets/wp_user_password)
+export WORDPRESS_DB_HOST="mariadb"
+
+log "Database credentials loaded from secrets"
+log "Database: $WORDPRESS_DB_NAME, User: $WORDPRESS_DB_USER, Host: $WORDPRESS_DB_HOST"
+
 # Sprawdź czy WordPress już nie jest zainstalowany
 if [ ! -f "/var/www/html/wp-config.php" ]; then
     log "WordPress not found, installing..."
@@ -28,12 +38,11 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
     chmod +x wp-cli.phar
     mv wp-cli.phar /usr/local/bin/wp
     
-    # Czekaj na bazę danych z timeout
+    # Czekaj na bazę danych z timeout (używaj danych z secrets)
     log "Waiting for MariaDB to be ready..."
     counter=0
     max_tries=30
-    
-    until mysql -h mariadb -u ${MYSQL_USER} -p${MYSQL_PASSWORD} -e "SELECT 1" > /dev/null 2>&1; do
+    until mysql -h "$WORDPRESS_DB_HOST" -u "$WORDPRESS_DB_USER" -p"$WORDPRESS_DB_PASSWORD" -e "SELECT 1" > /dev/null 2>&1; do
         counter=$((counter + 1))
         if [ $counter -eq $max_tries ]; then
             log "ERROR: Could not connect to MariaDB after $max_tries attempts"
@@ -48,13 +57,13 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
     # Ustaw właściciela plików
     chown -R www-data:www-data /var/www/html
     
-    # Konfiguruj WordPress
+    # Konfiguruj WordPress (używaj danych z secrets)
     log "Configuring WordPress..."
     wp core config \
-        --dbname=${MYSQL_DATABASE} \
-        --dbuser=${MYSQL_USER} \
-        --dbpass=${MYSQL_PASSWORD} \
-        --dbhost=mariadb:3306 \
+        --dbname="$WORDPRESS_DB_NAME" \
+        --dbuser="$WORDPRESS_DB_USER" \
+        --dbpass="$WORDPRESS_DB_PASSWORD" \
+        --dbhost="$WORDPRESS_DB_HOST:3306" \
         --allow-root \
         --path=/var/www/html
     
@@ -85,7 +94,6 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
     # Ustaw właściciela plików ponownie
     chown -R www-data:www-data /var/www/html
     chmod -R 755 /var/www/html
-    
 else
     log "WordPress configuration already exists."
 fi

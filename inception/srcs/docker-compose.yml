@@ -5,6 +5,11 @@ services:
   mariadb:
     build: 
       context: ./requirements/mariadb
+    secrets:
+    - mysql_root_password
+    - mysql_database
+    - mysql_user
+    - mysql_password
     container_name: mariadb
     restart: unless-stopped
     env_file: .env
@@ -13,14 +18,25 @@ services:
     networks:
       - inception_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 20s
       retries: 10
       interval: 5s
+    # healthcheck:  #previous
+    #   test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+    #   timeout: 20s
+    #   retries: 10
+    #   interval: 5s
 
   wordpress:
     build: 
       context: ./requirements/wordpress
+    secrets:
+    - mysql_database
+    - mysql_user
+    - mysql_password      
+    - wp_admin_password
+    - wp_user_password
     container_name: wordpress
     restart: unless-stopped
     env_file: .env
@@ -45,6 +61,20 @@ services:
       - inception_network
     depends_on:
       - wordpress
+
+secrets:
+  mysql_root_password:
+    file: ../secrets/mysql_root_password
+  mysql_database:
+    file: ../secrets/mysql_database
+  mysql_user:
+    file: ../secrets/mysql_user
+  mysql_password:
+    file: ../secrets/mysql_password
+  wp_admin_password:
+    file: ../secrets/wp_admin_password
+  wp_user_password:
+    file: ../secrets/wp_user_password
 
 volumes:
   mariadb_data:
