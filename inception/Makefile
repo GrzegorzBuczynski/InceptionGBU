@@ -5,7 +5,9 @@ up:
 	mkdir -p /home/${USER}/data/mariadb
 	mkdir -p /home/${USER}/data/wordpress
 	sudo chown -R 999:999 /home/${USER}/data/mariadb
+	sudo chmod -R 755 /home/${USER}/data/mariadb
 	sudo chown -R www-data:www-data /home/${USER}/data/wordpress
+	sudo chmod -R 755 /home/${USER}/data/wordpress
 	@if [ ! -f .env ]; then \
 		if [ -f srcs/.env.example ]; then \
 			echo "Copying srcs/.env.example to srcs/.env..."; \
@@ -27,6 +29,20 @@ clean: down
 
 fclean: clean
 	sudo rm -rf /home/${USER}/data
+
+# Dodaj te zasady:
+re: fclean up
+
+down:
+	docker-compose -f srcs/docker-compose.yml down
+
+# Jeszcze bardziej agresywne czyszczenie (opcjonalne)
+purge: down
+	docker system prune -af --volumes
+	sudo rm -rf /home/${USER}/data
+	docker network prune -f
+	# Usuń konkretne obrazy jeśli istnieją
+	-docker rmi srcs_mariadb srcs_wordpress srcs_nginx 2>/dev/null || true
 
 re: fclean all
 

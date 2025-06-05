@@ -8,8 +8,9 @@ log() {
 
 log "Starting WordPress setup..."
 
+# Wczytaj dane z secrets do zmiennych środowiskowych
 export WORDPRESS_DB_NAME=$(cat /run/secrets/mysql_database)
-export WORDPRESS_DB_USER=$(cat /run/secrets/mysql_user)  
+export WORDPRESS_DB_USER=$(cat /run/secrets/mysql_user)
 export WORDPRESS_DB_PASSWORD=$(cat /run/secrets/mysql_password)
 export WP_ADMIN_PASSWORD=$(cat /run/secrets/wp_admin_password)
 export WP_USER_PASSWORD=$(cat /run/secrets/wp_user_password)
@@ -57,15 +58,46 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
     # Ustaw właściciela plików
     chown -R www-data:www-data /var/www/html
     
-    # Konfiguruj WordPress (używaj danych z secrets)
+    # Konfiguruj WordPress - NOWA METODA z automatycznym tworzeniem wp-config.php
     log "Configuring WordPress..."
-    wp core config \
+    
+    # Najpierw spróbuj WP-CLI
+    if wp core config \
         --dbname="$WORDPRESS_DB_NAME" \
         --dbuser="$WORDPRESS_DB_USER" \
         --dbpass="$WORDPRESS_DB_PASSWORD" \
         --dbhost="$WORDPRESS_DB_HOST:3306" \
         --allow-root \
-        --path=/var/www/html
+        --path=/var/www/html 2>/dev/null; then
+        log "wp-config.php created successfully with WP-CLI"
+    else
+        # Jeśli WP-CLI się nie udał, utwórz plik ręcznie
+        log "WP-CLI failed, creating wp-config.php manually..."
+        
+        if [ -f "wp-config-sample.php" ]; then
+            cp wp-config-sample.php wp-config.php
+            
+            # Zastąp wartości w pliku
+            sed -i "s/database_name_here/$WORDPRESS_DB_NAME/g" wp-config.php
+            sed -i "s/username_here/$WORDPRESS_DB_USER/g" wp-config.php  
+            sed -i "s/password_here/$WORDPRESS_DB_PASSWORD/g" wp-config.php
+            sed -i "s/localhost/$WORDPRESS_DB_HOST/g" wp-config.php
+            
+            # Dodaj unikalne klucze bezpieczeństwa
+            log "Generating security keys..."
+            SALT=$(curl -s https://api.wordpress.org/secret-key/1.1/salt/)
+            if [ -n "$SALT" ]; then
+                # Usuń stare klucze i dodaj nowe
+                sed -i '/AUTH_KEY\|SECURE_AUTH_KEY\|LOGGED_IN_KEY\|NONCE_KEY\|AUTH_SALT\|SECURE_AUTH_SALT\|LOGGED_IN_SALT\|NONCE_SALT/d' wp-config.php
+                sed -i "/\$table_prefix = 'wp_';/i\\$SALT" wp-config.php
+            fi
+            
+            log "wp-config.php created successfully manually"
+        else
+            log "ERROR: wp-config-sample.php not found!"
+            exit 1
+        fi
+    fi
     
     # Sprawdź czy baza danych istnieje, jeśli nie - zainstaluj WordPress
     if ! wp core is-installed --allow-root --path=/var/www/html; then
@@ -74,7 +106,7 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
             --url=${DOMAIN_NAME} \
             --title="My WordPress Site" \
             --admin_user=${WP_ADMIN_USER} \
-            --admin_password=${WP_ADMIN_PASSWORD} \
+            --admin_password="$WP_ADMIN_PASSWORD" \
             --admin_email=${WP_ADMIN_EMAIL} \
             --allow-root \
             --path=/var/www/html
@@ -82,7 +114,7 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
         # Utwórz dodatkowego użytkownika
         log "Creating additional user..."
         wp user create ${WP_USER} ${WP_USER_EMAIL} \
-            --user_pass=${WP_USER_PASSWORD} \
+            --user_pass="$WP_USER_PASSWORD" \
             --allow-root \
             --path=/var/www/html
         

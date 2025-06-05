@@ -1,0 +1,46 @@
+**Podaj dane z twoich plików secrets:**
+
+## **Sprawdź zawartość secrets:**
+
+```bash
+echo "Database Name: $(cat secrets/mysql_database)"
+echo "Username: $(cat secrets/mysql_user)" 
+echo "Password: $(cat secrets/mysql_password)"
+```
+
+## **W formularzu WordPress podaj:**
+
+- **Database Name**: `wordpress` (z pliku `secrets/mysql_database`)
+- **Username**: `wp_user` (z pliku `secrets/mysql_user`)
+- **Password**: `WpUserPass456!` (z pliku `secrets/mysql_password`)
+- **Database Host**: `mariadb` (nazwa kontenera MariaDB)
+- **Table Prefix**: zostaw domyślny `wp_` (lub zmień jeśli chcesz)
+
+## **Dlaczego WordPress pyta o dane ręcznie?**
+
+Twój skrypt `wordpress-setup.sh` **nie działa** - powinien automatycznie tworzyć `wp-config.php`. Problem był w secrets, które nie były dostępne.
+
+## **Sprawdź czy teraz secrets działają:**
+
+```bash
+# Sprawdź czy secrets są dostępne w kontenerze
+docker exec wordpress ls -la /run/secrets/
+docker exec wordpress cat /run/secrets/mysql_database
+```
+
+## **Po wprowadzeniu danych ręcznie:**
+
+WordPress powinien się połączyć z bazą danych i przejść do następnego kroku instalacji, gdzie podasz:
+- Tytuł strony
+- Login administratora (użyj `WP_ADMIN_USER` z .env)
+- Hasło administratora (z `secrets/wp_admin_password`)
+- Email administratora
+
+**Jeśli secrets teraz działają, przy następnym restarcie WordPress powinien się konfigurować automatycznie.**
+
+user@debian-doker:~/Documents/InceptionGBU/inception$ echo "Database Name: $(cat secrets/mysql_database)"
+echo "Username: $(cat secrets/mysql_user)" 
+echo "Password: $(cat secrets/mysql_password)"
+Database Name: wordpress
+Username: wp_user
+Password: WpUserPass456!

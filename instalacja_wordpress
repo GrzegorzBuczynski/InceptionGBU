@@ -1,0 +1,36 @@
+**Podaj te dane z twoich plików .env i secrets:**
+
+## **Site Title:**
+```
+My WordPress Site
+```
+(lub dowolny tytuł jaki chcesz)
+
+## **Username:**
+```
+site_admin
+```
+(z `WP_ADMIN_USER` w .env)
+
+## **Password:**
+```
+AdPass789!
+```
+(z pliku `secrets/wp_admin_password`)
+
+## **Your Email:**
+```
+admin@jkowalski.42.fr
+```
+(z `WP_ADMIN_EMAIL` w .env)
+
+## **Search engine visibility:**
+**NIE zaznaczaj** tej opcji (zostaw puste) - chcesz żeby strona była widoczna w wyszukiwarkach.
+
+---
+
+**Po wypełnieniu kliknij "Install WordPress".**
+
+WordPress utworzy konto administratora z tymi danymi i będziesz mógł się zalogować używając:
+- Login: `site_admin`  
+- Hasło: `AdPass789!`
