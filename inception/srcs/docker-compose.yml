@@ -3,8 +3,7 @@ version: '3.8'
 
 services:
   mariadb:
-    build: 
-      context: ./requirements/mariadb
+    build: ./requirements/mariadb
     secrets:
     - mysql_root_password
     - mysql_database
@@ -18,10 +17,27 @@ services:
     networks:
       - inception_network
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$$(cat /run/secrets/mysql_root_password)"]
+      test: ["CMD-SHELL", "mysqladmin ping -h mariadb -u$$(cat /run/secrets/mysql_user) -p$$(cat /run/secrets/mysql_password)"]
       timeout: 20s
       retries: 10
       interval: 5s
+      start_period: 10s
+
+    # healthcheck:
+    #   test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$$(cat /run/secrets/mysql_user) -p$$(cat /run/secrets/mysql_password)"]
+    #   timeout: 20s
+    #   retries: 10
+    #   interval: 5s
+
+      # test: ["CMD-SHELL", "mysqladmin ping -h localhost -u $${MYSQL_USER} -p$$(cat /run/secrets/mysql_password)"]
+      # timeout: 20s
+      # retries: 10
+      # interval: 5s
+
+      # test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$$(cat /run/secrets/mysql_root_password)"]
+      # timeout: 20s
+      # retries: 10
+      # interval: 5s
 
     # healthcheck:
     #   test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
@@ -42,6 +58,7 @@ services:
   wordpress:
     build: 
       context: ./requirements/wordpress
+      dockerfile: dockerfile
     secrets:
     - mysql_database
     - mysql_user
@@ -56,14 +73,13 @@ services:
     networks:
       - inception_network
     depends_on:
-      - mariadb
+      mariadb:
+        condition: service_healthy
 
   nginx:
-    build: 
-      context: ./requirements/nginx
     container_name: nginx
+    build: ./requirements/nginx
     restart: unless-stopped
-    env_file: .env
     ports:
       - "443:443"
     volumes:

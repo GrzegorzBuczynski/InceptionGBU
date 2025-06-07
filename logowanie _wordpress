@@ -3,7 +3,7 @@ step 2
 - **Username**: `wp_user` 
 `wp_user`
 - **Password**:   WpUserPass456!
-`WpUserPass456!`
+WpUserPass456!
 - **Database Host**: `mariadb` (nazwa kontenera MariaDB)
 - **Table Prefix**: zostaw domyślny `wp_` (lub zmień jeśli chcesz)
 step 3
