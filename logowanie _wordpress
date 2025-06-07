@@ -1,3 +1,15 @@
+step 2
+- **Database Name**: `wordpress` (z pliku `secrets/mysql_database`)
+- **Username**: `wp_user` (z pliku `secrets/mysql_user`)
+- **Password**: `WpUserPass456!` (z pliku `secrets/mysql_password`)
+- **Database Host**: `mariadb` (nazwa kontenera MariaDB)
+- **Table Prefix**: zostaw domyślny `wp_` (lub zmień jeśli chcesz)
+step 3
+- Login administratora (użyj `WP_ADMIN_USER` z .env)
+- Hasło administratora (      AdPass789!            )(
+WP_ADMIN_EMAIL=             admin@jkowalski.42.fr
+
+
 **Podaj dane z twoich plików secrets:**
 
 ## **Sprawdź zawartość secrets:**
@@ -33,7 +45,7 @@ docker exec wordpress cat /run/secrets/mysql_database
 WordPress powinien się połączyć z bazą danych i przejść do następnego kroku instalacji, gdzie podasz:
 - Tytuł strony
 - Login administratora (użyj `WP_ADMIN_USER` z .env)
-- Hasło administratora (z `secrets/wp_admin_password`)
+- Hasło administratora (      AdPass789!            )(z `secrets/wp_admin_password`)
 - Email administratora
 
 **Jeśli secrets teraz działają, przy następnym restarcie WordPress powinien się konfigurować automatycznie.**

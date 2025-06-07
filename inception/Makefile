@@ -33,9 +33,6 @@ fclean: clean
 # Dodaj te zasady:
 re: fclean up
 
-down:
-	docker-compose -f srcs/docker-compose.yml down
-
 # Jeszcze bardziej agresywne czyszczenie (opcjonalne)
 purge: down
 	docker system prune -af --volumes
