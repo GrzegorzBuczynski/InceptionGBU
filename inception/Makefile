@@ -1,24 +1,41 @@
 # Makefile
 all: up
 
+# up:
+# 	mkdir -p /home/${USER}/data/mariadb
+# 	mkdir -p /home/${USER}/data/wordpress
+# 	sudo chown -R 999:999 /home/${USER}/data/mariadb
+# 	sudo chmod -R 755 /home/${USER}/data/mariadb
+# 	sudo chown -R www-data:www-data /home/${USER}/data/wordpress
+# 	sudo chmod -R 755 /home/${USER}/data/wordpress
+# 	@if [ ! -f .env ]; then \
+# 		if [ -f srcs/.env.example ]; then \
+# 			echo "Copying srcs/.env.example to srcs/.env..."; \
+# 			cp srcs/.env.example srcs/.env; \
+# 		else \
+# 			echo "Warning: srcs/.env.example not found!"; \
+# 		fi; \
+# 	else \
+# 		echo ".env already exists"; \
+# 	fi
+# 	docker-compose -f srcs/docker-compose.yml up -d --build
+
+
 up:
 	mkdir -p /home/${USER}/data/mariadb
 	mkdir -p /home/${USER}/data/wordpress
-	sudo chown -R 999:999 /home/${USER}/data/mariadb
-	sudo chmod -R 755 /home/${USER}/data/mariadb
-	sudo chown -R www-data:www-data /home/${USER}/data/wordpress
-	sudo chmod -R 755 /home/${USER}/data/wordpress
-	@if [ ! -f .env ]; then \
+	@if [ ! -f srcs/.env ]; then \
+		echo "Creating .env file..."; \
 		if [ -f srcs/.env.example ]; then \
-			echo "Copying srcs/.env.example to srcs/.env..."; \
 			cp srcs/.env.example srcs/.env; \
-		else \
-			echo "Warning: srcs/.env.example not found!"; \
 		fi; \
+		echo "DATA_PATH=/home/${USER}/data" >> srcs/.env; \
 	else \
-		echo ".env already exists"; \
+		echo ".env file already exists. Ensuring DATA_PATH is set..."; \
+		grep -qF "DATA_PATH=" srcs/.env || echo "DATA_PATH=/home/${USER}/data" >> srcs/.env; \
 	fi
 	docker-compose -f srcs/docker-compose.yml up -d --build
+
 
 down:
 	docker-compose -f srcs/docker-compose.yml down

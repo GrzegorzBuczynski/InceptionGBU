@@ -5,8 +5,9 @@ step 2
 - **Database Host**: `mariadb` (nazwa kontenera MariaDB)
 - **Table Prefix**: zostaw domyślny `wp_` (lub zmień jeśli chcesz)
 step 3
+- site title    My_site
 - Login administratora (użyj `WP_ADMIN_USER` z .env)
-- Hasło administratora (      AdPass789!            )(
+- Hasło administratora (      AdPass789!
 WP_ADMIN_EMAIL=             admin@jkowalski.42.fr
 
 

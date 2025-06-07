@@ -1,0 +1,495 @@
+
+# Makefile
+all: up
+
+up:
+	mkdir -p /home/${USER}/data/mariadb
+	mkdir -p /home/${USER}/data/wordpress
+	sudo chown -R 999:999 /home/${USER}/data/mariadb
+	sudo chmod -R 755 /home/${USER}/data/mariadb
+	sudo chown -R www-data:www-data /home/${USER}/data/wordpress
+	sudo chmod -R 755 /home/${USER}/data/wordpress
+	@if [ ! -f .env ]; then \
+		if [ -f srcs/.env.example ]; then \
+			echo "Copying srcs/.env.example to srcs/.env..."; \
+			cp srcs/.env.example srcs/.env; \
+		else \
+			echo "Warning: srcs/.env.example not found!"; \
+		fi; \
+	else \
+		echo ".env already exists"; \
+	fi
+	docker-compose -f srcs/docker-compose.yml up -d --build
+
+down:
+	docker-compose -f srcs/docker-compose.yml down
+
+clean: down
+	docker system prune -af
+	docker volume prune -f
+
+fclean: clean
+	sudo rm -rf /home/${USER}/data
+
+# Dodaj te zasady:
+re: fclean up
+
+# Jeszcze bardziej agresywne czyszczenie (opcjonalne)
+purge: down
+	docker system prune -af --volumes
+	sudo rm -rf /home/${USER}/data
+	docker network prune -f
+	# Usuń konkretne obrazy jeśli istnieją
+	-docker rmi srcs_mariadb srcs_wordpress srcs_nginx 2>/dev/null || true
+
+re: fclean all
+
+logs:
+	docker-compose log
+
+images:
+	docker images
+
+status:
+	docker-compose -f srcs/docker-compose.yml ps
+
+polacz_nginx:
+	docker exec -it nginx bash
+
+volumes:
+	docker volume ls
+
+# Sprawdź czy nginx używa odpowiednich wersji TLS
+docker_encryption:
+	docker exec nginx nginx -T | grep ssl_protocols
+	docker exec nginx nginx -T | grep ssl_protocols
+
+.PHONY: all up down clean fclean re
+
+...............
+
+# Lista wszystkich sieci
+list_network:
+	docker network ls
+
+# Szczegóły konkretnej sieci
+inspect:
+	docker network inspect inception_network
+
+# Zobacz które kontenery są podłączone
+inspect2:
+	docker network inspect inception_network | grep -A 10 "Containers"
+
+
+# srcs/docker-compose.yml
+version: '3.8'
+
+services:
+  mariadb:
+    build: 
+      context: ./requirements/mariadb
+    secrets:
+    - mysql_root_password
+    - mysql_database
+    - mysql_user
+    - mysql_password
+    container_name: mariadb
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - inception_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+      interval: 5s
+    # healthcheck:  #previous
+    #   test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+    #   timeout: 20s
+    #   retries: 10
+    #   interval: 5s
+
+  wordpress:
+    build: 
+      context: ./requirements/wordpress
+    secrets:
+    - mysql_database
+    - mysql_user
+    - mysql_password      
+    - wp_admin_password
+    - wp_user_password
+    container_name: wordpress
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - inception_network
+    depends_on:
+      - mariadb
+
+  nginx:
+    build: 
+      context: ./requirements/nginx
+    container_name: nginx
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "443:443"
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - inception_network
+    depends_on:
+      - wordpress
+
+secrets:
+  mysql_root_password:
+    file: ../secrets/mysql_root_password
+  mysql_database:
+    file: ../secrets/mysql_database
+  mysql_user:
+    file: ../secrets/mysql_user
+  mysql_password:
+    file: ../secrets/mysql_password
+  wp_admin_password:
+    file: ../secrets/wp_admin_password
+  wp_user_password:
+    file: ../secrets/wp_user_password
+
+volumes:
+  mariadb_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/user/data/mariadb
+  wordpress_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/user/data/wordpress
+
+networks:
+  inception_network:
+    driver: bridge
+
+.........
+
+FROM debian:bullseye
+
+# Zainstaluj MariaDB
+RUN apt-get update && apt-get install -y \
+    mariadb-server \
+    mariadb-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Skopiuj konfigurację
+COPY conf/50-server.cnf /etc/mysql/mariadb.conf.d/50-server.cnf
+
+# Skopiuj skrypt setup
+COPY tools/mariadb-setup.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/mariadb-setup.sh
+
+# Przygotuj katalogi dla MariaDB
+RUN mkdir -p /var/run/mysqld /var/lib/mysql /var/log/mysql \
+    && chown -R mysql:mysql /var/run/mysqld \
+    && chown -R mysql:mysql /var/lib/mysql \
+    && chown -R mysql:mysql /var/log/mysql
+
+# Eksponuj port
+EXPOSE 3306
+
+# Uruchom jako root (kontener zarządza uprawnieniami wewnętrznie)
+ENTRYPOINT ["/usr/local/bin/mariadb-setup.sh"]
+CMD ["mysqld", "--user=mysql"]
+
+.......
+
+#!/bin/bash
+# srcs/requirements/mariadb/tools/mariadb-setup.sh
+
+# Funkcja do logowania
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] MariaDB: $1"
+}
+
+log "Starting MariaDB setup..."
+
+MYSQL_ROOT_PASSWORD=$(cat /run/secrets/mysql_root_password)
+MYSQL_DATABASE=$(cat /run/secrets/mysql_database)
+MYSQL_USER=$(cat /run/secrets/mysql_user)
+MYSQL_PASSWORD=$(cat /run/secrets/mysql_password)
+
+# Sprawdź czy baza danych nie jest już zainicjowana
+if [ ! -f "/var/lib/mysql/.wordpress_initialized" ]; then
+    log "Initializing MariaDB database..."
+    
+    # Inicjalizuj bazę danych
+    mysql_install_db --user=mysql --datadir=/var/lib/mysql --rpm
+    
+    log "Starting temporary MariaDB instance for setup..."
+    
+    # Uruchom tymczasową instancję MariaDB w tle
+    mysqld --user=mysql --skip-networking --socket=/tmp/mysql_temp.sock &
+    MYSQL_PID=$!
+    
+    # Czekaj na uruchomienie
+    for i in {1..30}; do
+        if mysql --socket=/tmp/mysql_temp.sock -e "SELECT 1" >/dev/null 2>&1; then
+            log "Temporary MariaDB instance is ready"
+            break
+        fi
+        log "Waiting for temporary MariaDB instance... ($i/30)"
+        sleep 1
+    done
+    
+    log "Configuring database and users..."
+    
+    # Skonfiguruj bazę danych i użytkowników
+    mysql --socket=/tmp/mysql_temp.sock << EOF
+USE mysql;
+FLUSH PRIVILEGES;
+
+-- Ustaw hasło root
+ALTER USER 'root'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
+
+-- Usuń anonimowych użytkowników
+DELETE FROM mysql.user WHERE User='';
+
+-- Usuń test database
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+
+-- Utwórz bazę danych WordPress
+CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\`;
+
+-- Utwórz użytkownika WordPress
+CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
+GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'%';
+
+-- Aplikuj zmiany
+FLUSH PRIVILEGES;
+EOF
+
+    # Zatrzymaj tymczasową instancję
+    log "Stopping temporary MariaDB instance..."
+    kill $MYSQL_PID
+    wait $MYSQL_PID 2>/dev/null
+    
+    log "MariaDB setup completed!"
+else
+    log "MariaDB already initialized"
+fi
+
+# Oznacz jako zainicjowane
+touch /var/lib/mysql/.wordpress_initialized
+
+log "Starting MariaDB server..."
+exec "$@"
+
+#chmod +x inception/srcs/requirements/mariadb/tools/mariadb-setup.sh
+
+........
+
+[mysqld]
+bind-address = 0.0.0.0
+port = 3306
+datadir = /var/lib/mysql
+socket = /var/run/mysqld/mysqld.sock
+
+......
+
+[www]
+user = www-data
+group = www-data
+listen = 9000
+listen.owner = www-data
+listen.group = www-data
+pm = dynamic
+pm.max_children = 5
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+clear_env = no
+
+......
+
+#!/bin/bash
+# srcs/requirements/wordpress/tools/wordpress-setup.sh
+
+# Funkcja do logowania
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+log "Starting WordPress setup..."
+
+# Wczytaj dane z secrets do zmiennych środowiskowych
+export WORDPRESS_DB_NAME=$(cat /run/secrets/mysql_database)
+export WORDPRESS_DB_USER=$(cat /run/secrets/mysql_user)
+export WORDPRESS_DB_PASSWORD=$(cat /run/secrets/mysql_password)
+export WP_ADMIN_PASSWORD=$(cat /run/secrets/wp_admin_password)
+export WP_USER_PASSWORD=$(cat /run/secrets/wp_user_password)
+export WORDPRESS_DB_HOST="mariadb"
+
+log "Database credentials loaded from secrets"
+log "Database: $WORDPRESS_DB_NAME, User: $WORDPRESS_DB_USER, Host: $WORDPRESS_DB_HOST"
+
+# Sprawdź czy WordPress już nie jest zainstalowany
+if [ ! -f "/var/www/html/wp-config.php" ]; then
+    log "WordPress not found, installing..."
+    
+    # Pobierz WordPress
+    log "Downloading WordPress..."
+    curl -O https://wordpress.org/latest.tar.gz
+    tar xzf latest.tar.gz
+    
+    # Skopiuj pliki WordPress (bezpieczniej niż mv)
+    log "Copying WordPress files..."
+    cp -r wordpress/* .
+    rm -rf wordpress latest.tar.gz
+    
+    # Pobierz WP-CLI
+    log "Downloading WP-CLI..."
+    curl -o wp-cli.phar https://github.com/wp-cli/wp-cli/releases/download/v2.10.0/wp-cli-2.10.0.phar
+    chmod +x wp-cli.phar
+    mv wp-cli.phar /usr/local/bin/wp
+    
+    # Czekaj na bazę danych z timeout (używaj danych z secrets)
+    log "Waiting for MariaDB to be ready..."
+    counter=0
+    max_tries=30
+    until mysql -h "$WORDPRESS_DB_HOST" -u "$WORDPRESS_DB_USER" -p"$WORDPRESS_DB_PASSWORD" -e "SELECT 1" > /dev/null 2>&1; do
+        counter=$((counter + 1))
+        if [ $counter -eq $max_tries ]; then
+            log "ERROR: Could not connect to MariaDB after $max_tries attempts"
+            exit 1
+        fi
+        log "Attempt $counter/$max_tries: Waiting for MariaDB..."
+        sleep 2
+    done
+    
+    log "MariaDB is ready!"
+    
+    # Ustaw właściciela plików
+    chown -R www-data:www-data /var/www/html
+    
+    # Konfiguruj WordPress - NOWA METODA z automatycznym tworzeniem wp-config.php
+    log "Configuring WordPress..."
+    
+    # Najpierw spróbuj WP-CLI
+    if wp core config \
+        --dbname="$WORDPRESS_DB_NAME" \
+        --dbuser="$WORDPRESS_DB_USER" \
+        --dbpass="$WORDPRESS_DB_PASSWORD" \
+        --dbhost="$WORDPRESS_DB_HOST:3306" \
+        --allow-root \
+        --path=/var/www/html 2>/dev/null; then
+        log "wp-config.php created successfully with WP-CLI"
+    else
+        # Jeśli WP-CLI się nie udał, utwórz plik ręcznie
+        log "WP-CLI failed, creating wp-config.php manually..."
+        
+        if [ -f "wp-config-sample.php" ]; then
+            cp wp-config-sample.php wp-config.php
+            
+            # Zastąp wartości w pliku
+            sed -i "s/database_name_here/$WORDPRESS_DB_NAME/g" wp-config.php
+            sed -i "s/username_here/$WORDPRESS_DB_USER/g" wp-config.php  
+            sed -i "s/password_here/$WORDPRESS_DB_PASSWORD/g" wp-config.php
+            sed -i "s/localhost/$WORDPRESS_DB_HOST/g" wp-config.php
+            
+            # Dodaj unikalne klucze bezpieczeństwa
+            log "Generating security keys..."
+            SALT=$(curl -s https://api.wordpress.org/secret-key/1.1/salt/)
+            if [ -n "$SALT" ]; then
+                # Usuń stare klucze i dodaj nowe
+                sed -i '/AUTH_KEY\|SECURE_AUTH_KEY\|LOGGED_IN_KEY\|NONCE_KEY\|AUTH_SALT\|SECURE_AUTH_SALT\|LOGGED_IN_SALT\|NONCE_SALT/d' wp-config.php
+                sed -i "/\$table_prefix = 'wp_';/i\\$SALT" wp-config.php
+            fi
+            
+            log "wp-config.php created successfully manually"
+        else
+            log "ERROR: wp-config-sample.php not found!"
+            exit 1
+        fi
+    fi
+    
+    # Sprawdź czy baza danych istnieje, jeśli nie - zainstaluj WordPress
+    if ! wp core is-installed --allow-root --path=/var/www/html; then
+        log "Installing WordPress..."
+        wp core install \
+            --url=${DOMAIN_NAME} \
+            --title="My WordPress Site" \
+            --admin_user=${WP_ADMIN_USER} \
+            --admin_password="$WP_ADMIN_PASSWORD" \
+            --admin_email=${WP_ADMIN_EMAIL} \
+            --allow-root \
+            --path=/var/www/html
+        
+        # Utwórz dodatkowego użytkownika
+        log "Creating additional user..."
+        wp user create ${WP_USER} ${WP_USER_EMAIL} \
+            --user_pass="$WP_USER_PASSWORD" \
+            --allow-root \
+            --path=/var/www/html
+        
+        log "WordPress installation completed!"
+    else
+        log "WordPress is already installed."
+    fi
+    
+    # Ustaw właściciela plików ponownie
+    chown -R www-data:www-data /var/www/html
+    chmod -R 755 /var/www/html
+else
+    log "WordPress configuration already exists."
+fi
+
+log "Starting PHP-FPM..."
+exec "$@"
+
+....
+
+FROM debian:bullseye
+
+RUN mkdir -p /run/php && chown www-data:www-data /run/php
+RUN apt-get update && apt-get install -y \
+    php7.4-fpm \
+    php7.4-mysql \
+    php7.4-curl \
+    php7.4-gd \
+    php7.4-intl \
+    php7.4-mbstring \
+    php7.4-soap \
+    php7.4-xml \
+    php7.4-xmlrpc \
+    php7.4-zip \
+    curl \
+    wget \
+    mariadb-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Skopiuj konfigurację PHP-FPM
+COPY conf/www.conf /etc/php/7.4/fpm/pool.d/www.conf
+
+# Skopiuj i ustaw uprawnienia dla skryptu setup
+COPY tools/wordpress-setup.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/wordpress-setup.sh
+
+# Utwórz katalog roboczy
+WORKDIR /var/www/html
+
+# Eksponuj port PHP-FPM
+EXPOSE 9000
+
+# Uruchom skrypt setup i PHP-FPM
+ENTRYPOINT ["/usr/local/bin/wordpress-setup.sh"]
+CMD ["php-fpm7.4", "-F"]
+
+... 
+w moim projekcie z dokerem startujac pierwszy raz na stronie wordpressa moge wprowadzić dane bazy danych, połączyć sie i zalogować ale przy nastepnym podniesieniu dokera przez make up coś jest uszkodzone(baza danych) co może być przyczyną jak naprawić? 

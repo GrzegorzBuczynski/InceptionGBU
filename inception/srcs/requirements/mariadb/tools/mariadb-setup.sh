@@ -1,83 +1,83 @@
 #!/bin/bash
 # srcs/requirements/mariadb/tools/mariadb-setup.sh
 
-# Funkcja do logowania
+# Logging function
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] MariaDB: $1"
 }
 
 log "Starting MariaDB setup..."
 
+# Load secrets into variables
 MYSQL_ROOT_PASSWORD=$(cat /run/secrets/mysql_root_password)
 MYSQL_DATABASE=$(cat /run/secrets/mysql_database)
 MYSQL_USER=$(cat /run/secrets/mysql_user)
 MYSQL_PASSWORD=$(cat /run/secrets/mysql_password)
 
-# Sprawdź czy baza danych nie jest już zainicjowana
-if [ ! -f "/var/lib/mysql/.wordpress_initialized" ]; then
-    log "Initializing MariaDB database..."
-    
-    # Inicjalizuj bazę danych
+# Check if the data directory is empty before initializing
+if [ ! -d "/var/lib/mysql/mysql" ]; then
+    log "Data directory is empty. Initializing MariaDB database..."
+
+    # Initialize the database system
     mysql_install_db --user=mysql --datadir=/var/lib/mysql --rpm
-    
+
     log "Starting temporary MariaDB instance for setup..."
-    
-    # Uruchom tymczasową instancję MariaDB w tle
-    mysqld --user=mysql --skip-networking --socket=/tmp/mysql_temp.sock &
+
+    # Start a temporary MariaDB instance in the background
+    mysqld_safe --user=mysql --skip-networking --socket=/tmp/mysql_temp.sock &
     MYSQL_PID=$!
-    
-    # Czekaj na uruchomienie
+
+    # Wait for the instance to be ready
     for i in {1..30}; do
-        if mysql --socket=/tmp/mysql_temp.sock -e "SELECT 1" >/dev/null 2>&1; then
-            log "Temporary MariaDB instance is ready"
+        if mysqladmin ping --socket=/tmp/mysql_temp.sock >/dev/null 2>&1; then
+            log "Temporary MariaDB instance is ready."
             break
         fi
         log "Waiting for temporary MariaDB instance... ($i/30)"
         sleep 1
     done
-    
+
     log "Configuring database and users..."
-    
-    # Skonfiguruj bazę danych i użytkowników
+
+    # Configure the database and users using SQL commands
     mysql --socket=/tmp/mysql_temp.sock << EOF
 USE mysql;
 FLUSH PRIVILEGES;
 
--- Ustaw hasło root
+-- Set the root password
 ALTER USER 'root'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
 
--- Usuń anonimowych użytkowników
+-- Remove anonymous users for security
 DELETE FROM mysql.user WHERE User='';
 
--- Usuń test database
+-- Remove the test database
 DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
 
--- Utwórz bazę danych WordPress
+-- Create the WordPress database
 CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\`;
 
--- Utwórz użytkownika WordPress
+-- Create the WordPress user
 CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
 GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'%';
 
--- Aplikuj zmiany
+-- Apply all changes
 FLUSH PRIVILEGES;
 EOF
 
-    # Zatrzymaj tymczasową instancję
+    # Stop the temporary instance
     log "Stopping temporary MariaDB instance..."
-    kill $MYSQL_PID
-    wait $MYSQL_PID 2>/dev/null
+    mysqladmin --socket=/tmp/mysql_temp.sock shutdown
+    wait $MYSQL_PID
     
-    log "MariaDB setup completed!"
+    log "MariaDB initial setup completed!"
 else
-    log "MariaDB already initialized"
+    log "MariaDB database already initialized. Skipping setup."
 fi
 
-# Oznacz jako zainicjowane
-touch /var/lib/mysql/.wordpress_initialized
-
 log "Starting MariaDB server..."
+# Execute the main container command (CMD)
 exec "$@"
+
 
 #chmod +x inception/srcs/requirements/mariadb/tools/mariadb-setup.sh
