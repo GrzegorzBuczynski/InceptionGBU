@@ -1,5 +1,3 @@
-# Makefile
-all: up
 
 # up:
 # 	mkdir -p /home/${USER}/data/mariadb
@@ -20,77 +18,88 @@ all: up
 # 	fi
 # 	docker-compose -f srcs/docker-compose.yml up -d --build
 
+# Makefile
 
+# Default target
+all: up
+
+# Start containers
 up:
 	mkdir -p /home/${USER}/data/mariadb
 	mkdir -p /home/${USER}/data/wordpress
 	@if [ ! -f srcs/.env ]; then \
-		echo "Creating .env file..."; \
+		echo "Creating .env file from example..."; \
 		if [ -f srcs/.env.example ]; then \
 			cp srcs/.env.example srcs/.env; \
 		fi; \
-		echo "DATA_PATH=/home/${USER}/data" >> srcs/.env; \
+		echo "\nDATA_PATH=/home/${USER}/data" >> srcs/.env; \
 	else \
 		echo ".env file already exists. Ensuring DATA_PATH is set..."; \
 		grep -qF "DATA_PATH=" srcs/.env || echo "DATA_PATH=/home/${USER}/data" >> srcs/.env; \
 	fi
-	docker-compose -f srcs/docker-compose.yml up -d --build
+	docker-compose -f srcs/docker-compose.yml --env-file srcs/.env up -d --build
 
-
+# Stop containers
 down:
-	docker-compose -f srcs/docker-compose.yml down
+	docker-compose -f srcs/docker-compose.yml --env-file srcs/.env down
 
+# Clean stopped containers and networks
 clean: down
 	docker system prune -af
 	docker volume prune -f
 
+# Clean everything including data
 fclean: clean
 	sudo rm -rf /home/${USER}/data
 
-# Dodaj te zasady:
-re: fclean up
+# Rebuild everything from scratch
+re: fclean all
 
-# Jeszcze bardziej agresywne czyszczenie (opcjonalne)
+# More aggressive cleaning
 purge: down
 	docker system prune -af --volumes
 	sudo rm -rf /home/${USER}/data
 	docker network prune -f
-	# Usuń konkretne obrazy jeśli istnieją
 	-docker rmi srcs_mariadb srcs_wordpress srcs_nginx 2>/dev/null || true
 
-re: fclean all
-
+# Show logs
 logs:
-	docker-compose log
+	docker-compose -f srcs/docker-compose.yml --env-file srcs/.env logs
 
+diagnose_maria:
+	docker-compose -f srcs/docker-compose.yml logs mariadb
+
+# List docker images
 images:
 	docker images
 
+# Show container status
 status:
-	docker-compose -f srcs/docker-compose.yml ps
+	docker-compose -f srcs/docker-compose.yml --env-file srcs/.env ps
 
+# Access nginx container shell
 polacz_nginx:
 	docker exec -it nginx bash
 
+# List docker volumes
 volumes:
 	docker volume ls
 
-# Sprawdź czy nginx używa odpowiednich wersji TLS
+# Check Nginx TLS/SSL protocols
 docker_encryption:
 	docker exec nginx nginx -T | grep ssl_protocols
-	docker exec nginx nginx -T | grep ssl_protocols
 
-.PHONY: all up down clean fclean re
-
-
-# Lista wszystkich sieci
+# List all networks
 list_network:
 	docker network ls
 
-# Szczegóły konkretnej sieci
+# Inspect the main network
 inspect:
 	docker network inspect inception_network
 
-# Zobacz które kontenery są podłączone
+# Inspect network to see connected containers
 inspect2:
 	docker network inspect inception_network | grep -A 10 "Containers"
+
+# Declare phony targets to avoid conflicts with file names
+.PHONY: all up down clean fclean re purge logs images status polacz_nginx volumes docker_encryption list_network inspect inspect2

@@ -1,6 +1,9 @@
 #!/bin/bash
 # srcs/requirements/mariadb/tools/mariadb-setup.sh
 
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
 # Logging function
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] MariaDB: $1"
@@ -8,76 +11,83 @@ log() {
 
 log "Starting MariaDB setup..."
 
-# Load secrets into variables
-MYSQL_ROOT_PASSWORD=$(cat /run/secrets/mysql_root_password)
-MYSQL_DATABASE=$(cat /run/secrets/mysql_database)
-MYSQL_USER=$(cat /run/secrets/mysql_user)
-MYSQL_PASSWORD=$(cat /run/secrets/mysql_password)
+# Define a marker file to check if setup has been completed
+MARKER_FILE="/var/lib/mysql/.mariadb_initialized"
 
-# Check if the data directory is empty before initializing
-if [ ! -d "/var/lib/mysql/mysql" ]; then
-    log "Data directory is empty. Initializing MariaDB database..."
+# Check if the marker file does NOT exist
+if [ ! -f "$MARKER_FILE" ]; then
+    log "Initialization marker not found. Starting first-time setup..."
 
-    # Initialize the database system
-    mysql_install_db --user=mysql --datadir=/var/lib/mysql --rpm
+    # Load secrets into variables
+    MYSQL_ROOT_PASSWORD=$(cat /run/secrets/mysql_root_password)
+    MYSQL_DATABASE=$(cat /run/secrets/mysql_database)
+    MYSQL_USER=$(cat /run/secrets/mysql_user)
+    MYSQL_PASSWORD=$(cat /run/secrets/mysql_password)
+
+    # Ensure the data directory is owned by mysql user
+    chown -R mysql:mysql /var/lib/mysql
+    
+    # Initialize the database system if the directory is truly empty
+    if [ ! -d "/var/lib/mysql/mysql" ]; then
+        log "Data directory appears empty, running mysql_install_db..."
+        mysql_install_db --user=mysql --datadir=/var/lib/mysql --rpm
+    fi
 
     log "Starting temporary MariaDB instance for setup..."
-
-    # Start a temporary MariaDB instance in the background
-    mysqld_safe --user=mysql --skip-networking --socket=/tmp/mysql_temp.sock &
+    mysqld_safe --user=mysql --skip-networking --socket=/tmp/mysql.sock &
     MYSQL_PID=$!
 
-    # Wait for the instance to be ready
-    for i in {1..30}; do
-        if mysqladmin ping --socket=/tmp/mysql_temp.sock >/dev/null 2>&1; then
-            log "Temporary MariaDB instance is ready."
-            break
-        fi
-        log "Waiting for temporary MariaDB instance... ($i/30)"
+    # Wait for it to be ready
+    until mysqladmin ping --socket=/tmp/mysql.sock --silent; do
+        log "Waiting for temporary MariaDB instance to be ready..."
         sleep 1
     done
+    log "Temporary MariaDB instance is ready."
 
-    log "Configuring database and users..."
-
-    # Configure the database and users using SQL commands
-    mysql --socket=/tmp/mysql_temp.sock << EOF
-USE mysql;
-FLUSH PRIVILEGES;
-
--- Set the root password
+    log "Executing SQL setup block..."
+    # Execute SQL setup. Piping the commands is more robust than a heredoc in some shells.
+    # This block now also creates the user and database.
+    mysql --socket=/tmp/mysql.sock -u root << EOF
+SET SESSION sql_log_bin=0;
 ALTER USER 'root'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
-
--- Remove anonymous users for security
-DELETE FROM mysql.user WHERE User='';
-
--- Remove the test database
 DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
-
--- Create the WordPress database
-CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\`;
-
--- Create the WordPress user
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+FLUSH PRIVILEGES;
+CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\` CHARACTER SET utf8 COLLATE utf8_general_ci;
 CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
 GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'%';
-
--- Apply all changes
 FLUSH PRIVILEGES;
 EOF
+    log "SQL setup block executed."
 
-    # Stop the temporary instance
+    # Final check: Verify that the WordPress user can actually connect
+    log "Verifying WordPress user connection..."
+    if ! mysqladmin --socket=/tmp/mysql.sock -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" ping --silent; then
+        log "FATAL ERROR: WordPress user cannot connect after setup. Aborting."
+        exit 1
+    fi
+    log "WordPress user connection verified successfully."
+
     log "Stopping temporary MariaDB instance..."
-    mysqladmin --socket=/tmp/mysql_temp.sock shutdown
-    wait $MYSQL_PID
+    # Use the new root password to shut down the server
+    if ! mysqladmin --socket=/tmp/mysql.sock -u root -p"${MYSQL_ROOT_PASSWORD}" shutdown; then
+        log "Could not shut down temporary server. Killing process."
+        kill -9 $MYSQL_PID
+    fi
     
-    log "MariaDB initial setup completed!"
+    # This line will only be reached if all previous commands were successful
+    touch "$MARKER_FILE"
+    log "MariaDB initial setup completed! Initialization marker created."
+
 else
-    log "MariaDB database already initialized. Skipping setup."
+    log "Initialization marker found. Skipping setup."
 fi
 
-log "Starting MariaDB server..."
-# Execute the main container command (CMD)
+log "Starting main MariaDB server..."
 exec "$@"
+
 
 
 #chmod +x inception/srcs/requirements/mariadb/tools/mariadb-setup.sh

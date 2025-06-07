@@ -1,14 +1,19 @@
 step 2
 - **Database Name**: `wordpress` (z pliku `secrets/mysql_database`)
-- **Username**: `wp_user` (z pliku `secrets/mysql_user`)
-- **Password**: `WpUserPass456!` (z pliku `secrets/mysql_password`)
+- **Username**: `wp_user` 
+`wp_user`
+- **Password**:   WpUserPass456!
+`WpUserPass456!`
 - **Database Host**: `mariadb` (nazwa kontenera MariaDB)
 - **Table Prefix**: zostaw domyślny `wp_` (lub zmień jeśli chcesz)
 step 3
 - site title    My_site
 - Login administratora (użyj `WP_ADMIN_USER` z .env)
+WP_ADMIN_USER
 - Hasło administratora (      AdPass789!
+AdPass789!
 WP_ADMIN_EMAIL=             admin@jkowalski.42.fr
+admin@jkowalski.42.fr
 
 
 **Podaj dane z twoich plików secrets:**
