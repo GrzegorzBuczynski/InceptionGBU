@@ -3,21 +3,26 @@
 # Force make to use bash for all shell commands, ensuring compatibility.
 SHELL := /bin/bash
 
+ENV_FILE = srcs/.env
+ENV_VARS = DOMAIN_NAME WP_ADMIN_USER WP_ADMIN_EMAIL WP_USER WP_USER_EMAIL DATA_PATH
+ITEMS = mysql_database mysql_password mysql_root_password mysql_user wp_admin_password wp_user_password
+
+
 # Default target
 all: up
 
 # Start containers with all checks
-up: check-config
+up: init-all
 	@echo Create data directories on the host
 	mkdir -p /home/${USER}/data/mariadb
 	mkdir -p /home/${USER}/data/wordpress
 	@# Step 4: Run Docker Compose
-	echo "Starting Docker containers..."
-# docker-compose -f srcs/docker-compose.yml --env-file srcs/.env up -d --build
+	@echo "Starting Docker containers..."
+	docker-compose -f srcs/docker-compose.yml --env-file $(ENV_FILE) up -d --build
 
 # Stop containers
 down:
-	docker-compose -f srcs/docker-compose.yml --env-file srcs/.env down
+	docker-compose -f srcs/docker-compose.yml --env-file $(ENV_FILE) down
 
 # Clean stopped containers and networks
 clean: down
@@ -40,7 +45,7 @@ purge: down
 
 # Show logs
 logs:
-	docker-compose -f srcs/docker-compose.yml --env-file srcs/.env logs
+	docker-compose -f srcs/docker-compose.yml --env-file $(ENV_FILE) logs
 
 logs-db:
 	docker-compose -f srcs/docker-compose.yml logs -f mariadb
@@ -57,7 +62,7 @@ images:
 
 # Show container status
 status:
-	docker-compose -f srcs/docker-compose.yml --env-file srcs/.env ps
+	docker-compose -f srcs/docker-compose.yml --env-file $(ENV_FILE) ps
 
 # Access nginx container shell
 polacz_nginx:
@@ -82,83 +87,49 @@ inspect:
 # Inspect network to see connected containers
 inspect2:
 	docker network inspect inception_network | grep -A 10 "Containers"
-
-
-
-
-# Check both .env and secrets
-check-config: check-env check-secrets
-	@echo "🎉 All configuration ready!"
-
  
-ENV_FILE = srcs/.env
-
-# Checks for .env file and validates its content
-check-env:
-	@echo "🔎 Checking environment configuration..."
-	@if [ ! -f "$(ENV_FILE)" ]; then \
-		echo "❌ Error: Configuration file '$(ENV_FILE)' not found."; \
-		echo "➡️  Run 'make init' to create it."; \
-		exit 1; \
-	fi
-	@missing_vars=0; \
-	for var in DOMAIN_NAME WP_ADMIN_USER WP_ADMIN_EMAIL WP_USER WP_USER_EMAIL DATA_PATH; do \
-		if ! grep -q "^$$var=" $(ENV_FILE); then \
-			echo "❌ Missing variable '$$var' in $(ENV_FILE)"; \
-			missing_vars=$$((missing_vars + 1)); \
-		fi; \
-	done; \
-	if [ $$missing_vars -gt 0 ]; then \
-		echo "\n🔧 Error: Found $$missing_vars missing variable(s). Please fix '$(ENV_FILE)'."; \
-		exit 1; \
-	fi
-	@echo "✅ Environment configuration is OK."
-
-# Check secrets folder
-check-secrets:
-	@echo "Check if secrets/* exist"
-	@if [ ! -d "secrets" ]; then \
-		echo "❌ Missing secrets/ - run 'make init-secrets'"; \
-		exit 1; \
-	fi; \
-	missing=0; \
-	for file in mysql_database mysql_password mysql_root_password mysql_user wp_admin_password wp_user_password; do \
-		if [ ! -f "secrets/$$file" ]; then \
-			echo "❌ Missing secrets/$$file"; \
-			missing=$$((missing + 1)); \
-		fi; \
-	done; \
-	if [ $$missing -gt 0 ]; then \
-		echo "🔧 Fix secrets/ or run 'make init-secrets'"; \
-		exit 1; \
-	fi; \
-	echo "✅ secrets OK"
 
 # Create .env file
 init-env:
+	@echo "🔍 Checking if .env variables exist"
 	@mkdir -p srcs
-	@echo "#.env" > $(ENV_FILE);
-	@echo DOMAIN_NAME=login.42.fr >> $(ENV_FILE);
-	@echo WP_ADMIN_USER=site_admin >> $(ENV_FILE);
-	@echo WP_ADMIN_EMAIL=admin@jkowalski.42.fr >> $(ENV_FILE);
-	@echo WP_USER=regular_user >> $(ENV_FILE);
-	@echo WP_USER_EMAIL=user@jkowalski.42.fr >> $(ENV_FILE);
-	@echo DATA_PATH=/home/user/data >> $(ENV_FILE);
-	@echo "✅ Created srcs/.env"
+	@touch $(ENV_FILE)
+	@for var in $(ENV_VARS); do \
+	if [ -z "$$(grep "^$$var=" $(ENV_FILE) | cut -d'=' -f2)" ]; then \
+		input=""; \
+		while [ -z "$$input" ]; do \
+			read -p "Type $$var and press enter: " input; \
+		done; \
+		if grep -q "^$$var=" $(ENV_FILE); then \
+			sed -i "s/^$$var=.*/$$var=$$input/" $(ENV_FILE); \
+		else \
+			echo "$$var=$$input" >> $(ENV_FILE); \
+		fi; \
+	fi; \
+	done
+	@echo "✅ .env file ok"
+
+
 
 # Create secrets files
 init-secrets:
+	@echo "🔍 Checking if secrets/ exist"
 	@mkdir -p secrets
-	@echo "my_wordpress_db" > secrets/mysql_database
-	@echo "user_password123" > secrets/mysql_password
-	@echo "root_password123" > secrets/mysql_root_password
-	@echo "wordpress_user" > secrets/mysql_user
-	@echo "admin_password123" > secrets/wp_admin_password
-	@echo "user_password123" > secrets/wp_user_password
-	@echo "✅ Created secrets/ files"
+	@for item in $(ITEMS); do \
+		if [ -z "$$(cat secrets/$$item 2>/dev/null)" ]; then \
+			while [ -z "$$input" ]; do \
+				read -p "Type $$item and press enter: " input; \
+			done && echo $$input > secrets/$$item; \
+			unset input; \
+		fi; \
+	done
+	@echo "✅ secrets/ OK"
+
+
 
 # Create both
 init-all: init-env init-secrets
+	@echo "🎉 All configuration ready!"
 
 
 # Declare phony targets to avoid conflicts with file names

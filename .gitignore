@@ -1,2 +1,8 @@
-#srcs/.env
-#secrets/
+inception/srcs/.env
+inception/secrets/
+
+# Ignoruj .env w dowolnym miejscu projektu
+**/.env
+
+# Ignoruj wszystkie foldery secrets
+**/secrets/
