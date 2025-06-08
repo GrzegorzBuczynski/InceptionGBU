@@ -3,10 +3,10 @@
 # Force make to use bash for all shell commands, ensuring compatibility.
 SHELL := /bin/bash
 
+# variable
 ENV_FILE = srcs/.env
 ENV_VARS = DOMAIN_NAME WP_ADMIN_USER WP_ADMIN_EMAIL WP_USER WP_USER_EMAIL DATA_PATH
-ITEMS = mysql_database mysql_password mysql_root_password mysql_user wp_admin_password wp_user_password
-
+SECRETS = mysql_database mysql_password mysql_root_password mysql_user wp_admin_password wp_user_password
 
 # Default target
 all: up
@@ -50,9 +50,11 @@ logs:
 logs-db:
 	docker-compose -f srcs/docker-compose.yml logs -f mariadb
 
+# -f stays for with follow mode
 logs-wp:
 	docker-compose -f srcs/docker-compose.yml logs -f wordpress
 
+# without follow mode
 diagnose_maria:
 	docker-compose -f srcs/docker-compose.yml logs mariadb
 
@@ -88,7 +90,6 @@ inspect:
 inspect2:
 	docker network inspect inception_network | grep -A 10 "Containers"
  
-
 # Create .env file
 init-env:
 	@echo "🔍 Checking if .env variables exist"
@@ -109,13 +110,11 @@ init-env:
 	done
 	@echo "✅ .env file ok"
 
-
-
 # Create secrets files
 init-secrets:
 	@echo "🔍 Checking if secrets/ exist"
 	@mkdir -p secrets
-	@for item in $(ITEMS); do \
+	@for item in $(SECRETS); do \
 		if [ -z "$$(cat secrets/$$item 2>/dev/null)" ]; then \
 			while [ -z "$$input" ]; do \
 				read -p "Type $$item and press enter: " input; \
@@ -125,12 +124,10 @@ init-secrets:
 	done
 	@echo "✅ secrets/ OK"
 
-
-
 # Create both
 init-all: init-env init-secrets
 	@echo "🎉 All configuration ready!"
 
 
 # Declare phony targets to avoid conflicts with file names
-.PHONY: all up down clean fclean re purge logs images status polacz_nginx volumes docker_encryption list_network inspect inspect2
+.PHONY: all up down clean fclean re purge logs logs-db logs-wp diagnose_maria images status polacz_nginx volumes docker_encryption list_network inspect inspect2 init-env init-secrets init-all
