@@ -1,2 +1,5 @@
-srcs/.env
-secrets/
+# Ignoruj .env w dowolnym miejscu projektu
+**/.env
+
+# Ignoruj wszystkie foldery secrets
+**/secrets/

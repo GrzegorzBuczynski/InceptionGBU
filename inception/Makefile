@@ -16,7 +16,6 @@ up: init-all
 	@echo Create data directories on the host
 	mkdir -p /home/${USER}/data/mariadb
 	mkdir -p /home/${USER}/data/wordpress
-	@# Step 4: Run Docker Compose
 	@echo "Starting Docker containers..."
 	docker-compose -f srcs/docker-compose.yml --env-file $(ENV_FILE) up -d --build
 
@@ -67,8 +66,14 @@ status:
 	docker-compose -f srcs/docker-compose.yml --env-file $(ENV_FILE) ps
 
 # Access nginx container shell
-polacz_nginx:
+conect_nginx_container:
 	docker exec -it nginx bash
+
+conect_mariadb_container:
+	docker exec -it mariadb bash
+
+conect_wordpress_container:
+	docker exec -it wordpress bash
 
 # List docker volumes
 volumes:
@@ -130,4 +135,4 @@ init-all: init-env init-secrets
 
 
 # Declare phony targets to avoid conflicts with file names
-.PHONY: all up down clean fclean re purge logs logs-db logs-wp diagnose_maria images status polacz_nginx volumes docker_encryption list_network inspect inspect2 init-env init-secrets init-all
+.PHONY: all up down clean fclean re purge logs logs-db logs-wp diagnose_maria images status conect_nginx_container volumes docker_encryption list_network inspect inspect2 init-env init-secrets init-all
