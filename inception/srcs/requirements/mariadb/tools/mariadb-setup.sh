@@ -1,6 +1,5 @@
 #!/bin/bash
 # srcs/requirements/mariadb/tools/mariadb-setup.sh
-
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
@@ -9,85 +8,110 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] MariaDB: $1"
 }
 
-log "Starting MariaDB setup..."
-
-# Define a marker file to check if setup has been completed
-MARKER_FILE="/var/lib/mysql/.mariadb_initialized"
-
-# Check if the marker file does NOT exist
-if [ ! -f "$MARKER_FILE" ]; then
-    log "Initialization marker not found. Starting first-time setup..."
-
-    # Load secrets into variables
-    MYSQL_ROOT_PASSWORD=$(cat /run/secrets/mysql_root_password)
-    MYSQL_DATABASE=$(cat /run/secrets/mysql_database)
-    MYSQL_USER=$(cat /run/secrets/mysql_user)
-    MYSQL_PASSWORD=$(cat /run/secrets/mysql_password)
-
-    # Ensure the data directory is owned by mysql user
-    chown -R mysql:mysql /var/lib/mysql
-    
-    # Initialize the database system if the directory is truly empty
-    if [ ! -d "/var/lib/mysql/mysql" ]; then
-        log "Data directory appears empty, running mysql_install_db..."
-        mysql_install_db --user=mysql --datadir=/var/lib/mysql --rpm
-    fi
-
-    log "Starting temporary MariaDB instance for setup..."
-    mysqld_safe --user=mysql --skip-networking --socket=/tmp/mysql.sock &
-    MYSQL_PID=$!
-
-    # Wait for it to be ready
-    until mysqladmin ping --socket=/tmp/mysql.sock --silent; do
-        log "Waiting for temporary MariaDB instance to be ready..."
-        sleep 1
-    done
-    log "Temporary MariaDB instance is ready."
-
-    log "Executing SQL setup block..."
-    # Execute SQL setup. Piping the commands is more robust than a heredoc in some shells.
-    # This block now also creates the user and database.
-    mysql --socket=/tmp/mysql.sock -u root << EOF
-SET SESSION sql_log_bin=0;
-ALTER USER 'root'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
-DROP DATABASE IF EXISTS test;
-DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
-DELETE FROM mysql.user WHERE User='';
-DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
-FLUSH PRIVILEGES;
-CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\` CHARACTER SET utf8 COLLATE utf8_general_ci;
-CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
-GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'%';
-FLUSH PRIVILEGES;
-EOF
-    log "SQL setup block executed."
-
-    # Final check: Verify that the WordPress user can actually connect
-    log "Verifying WordPress user connection..."
-    if ! mysqladmin --socket=/tmp/mysql.sock -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" ping --silent; then
-        log "FATAL ERROR: WordPress user cannot connect after setup. Aborting."
+# Function to read secrets from files
+read_secret() {
+    local secret_name=$1
+    local secret_file="/run/secrets/$secret_name"
+    if [ -f "$secret_file" ]; then
+        cat "$secret_file"
+    else
+        log "Error: Secret $secret_name not found in $secret_file" >&2
         exit 1
     fi
-    log "WordPress user connection verified successfully."
+}
 
-    log "Stopping temporary MariaDB instance..."
-    # Use the new root password to shut down the server
-    if ! mysqladmin --socket=/tmp/mysql.sock -u root -p"${MYSQL_ROOT_PASSWORD}" shutdown; then
-        log "Could not shut down temporary server. Killing process."
-        kill -9 $MYSQL_PID
-    fi
-    
-    # This line will only be reached if all previous commands were successful
-    touch "$MARKER_FILE"
-    log "MariaDB initial setup completed! Initialization marker created."
+# Use proper file path for marker
+MARKER_FILE="/var/lib/mysql/.initialized"
 
-else
-    log "Initialization marker found. Skipping setup."
+# Read secrets from files
+MYSQL_ROOT_PASSWORD=$(read_secret "mysql_root_password")
+MYSQL_DATABASE=$(read_secret "mysql_database")
+MYSQL_USER=$(read_secret "mysql_user")
+MYSQL_PASSWORD=$(read_secret "mysql_password")
+
+# Check if all required secrets were loaded
+if [ -z "$MYSQL_ROOT_PASSWORD" ] || [ -z "$MYSQL_DATABASE" ] || [ -z "$MYSQL_USER" ] || [ -z "$MYSQL_PASSWORD" ]; then
+    log "Error: Not all required secrets were loaded"
+    exit 1
 fi
 
-log "Starting main MariaDB server..."
+log "Secrets loaded successfully"
+
+# Check if MariaDB system tables are initialized
+if [ ! -f "$MARKER_FILE" ]; then
+    log "Starting MariaDB setup..."
+    
+    # Install and initialize the MariaDB database
+    mysql_install_db --user=mysql --datadir=/var/lib/mysql
+    
+    # Start the MySQL service
+    mysqld --user=mysql --datadir=/var/lib/mysql &
+    
+    log "Waiting for MariaDB to start..."
+    for i in $(seq 1 30); do
+        if mysqladmin ping --silent 2>/dev/null; then
+            log "MariaDB is ready!"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            log "Error: MariaDB failed to start within 30 seconds"
+            exit 1
+        fi
+        sleep 1
+    done
+    
+    # Secure root user
+    log "Securing root user..."
+    mysql -uroot -e "DROP USER IF EXISTS 'root'@'%';"
+    mysql -uroot -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$MYSQL_ROOT_PASSWORD';"
+    mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;"
+    mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "FLUSH PRIVILEGES;"
+    log "Root user secured - only localhost access allowed"
+    
+    # Create marker file for system initialization
+    touch "$MARKER_FILE"
+    log "MariaDB system initialization complete"
+    
+    # Stop the MySQL service
+    mysqladmin shutdown -uroot -p"$MYSQL_ROOT_PASSWORD"
+    
+else
+    log "MariaDB system already initialized"
+fi
+
+# Always check if the database exists (independent of system initialization)
+log "Checking if database '$MYSQL_DATABASE' exists..."
+
+# Start MariaDB to check/create database
+mysqld --user=mysql --datadir=/var/lib/mysql &
+
+log "Waiting for MariaDB to start..."
+for i in $(seq 1 30); do
+    if mysqladmin ping --silent 2>/dev/null; then
+        log "MariaDB is ready!"
+        break
+    fi
+    if [ $i -eq 30 ]; then
+        log "Error: MariaDB failed to start within 30 seconds"
+        exit 1
+    fi
+    sleep 1
+done
+
+# Check if the database exists
+if [ -d "/var/lib/mysql/$MYSQL_DATABASE" ]; then
+    log "Database '$MYSQL_DATABASE' already exists"
+else
+    log "Creating database '$MYSQL_DATABASE' and user '$MYSQL_USER'..."
+    mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE \`$MYSQL_DATABASE\`;"
+    mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "CREATE USER IF NOT EXISTS '$MYSQL_USER'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';"
+    mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "GRANT ALL ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_USER'@'%';"
+    mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "FLUSH PRIVILEGES;"
+    log "Database '$MYSQL_DATABASE' and user '$MYSQL_USER' created successfully"
+fi
+
+# Stop the MySQL service
+mysqladmin shutdown -uroot -p"$MYSQL_ROOT_PASSWORD"
+
+# Execute any additional commands passed to the script
 exec "$@"
-
-
-
-#chmod +x inception/srcs/requirements/mariadb/tools/mariadb-setup.sh

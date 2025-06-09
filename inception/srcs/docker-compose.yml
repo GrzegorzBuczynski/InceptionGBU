@@ -3,14 +3,14 @@ version: '3.8'
 
 services:
   mariadb:
-    build: ./requirements/mariadb
+    build: requirements/mariadb
     secrets:
-    - mysql_root_password
     - mysql_database
     - mysql_user
+    - mysql_root_password
     - mysql_password
     container_name: mariadb
-    restart: unless-stopped
+    restart: always
     env_file: .env
     volumes:
       - mariadb_data:/var/lib/mysql
@@ -25,17 +25,15 @@ services:
 
 
   wordpress:
-    build: 
-      context: ./requirements/wordpress
-      dockerfile: dockerfile
+    container_name: wordpress
+    build: requirements/wordpress
     secrets:
     - mysql_database
     - mysql_user
     - mysql_password      
     - wp_admin_password
     - wp_user_password
-    container_name: wordpress
-    restart: unless-stopped
+    restart: always
     env_file: .env
     volumes:
       - wordpress_data:/var/www/html
@@ -47,8 +45,8 @@ services:
 
   nginx:
     container_name: nginx
-    build: ./requirements/nginx
-    restart: unless-stopped
+    build: requirements/nginx
+    restart: always
     ports:
       - "443:443"
     volumes:
@@ -59,12 +57,12 @@ services:
       - wordpress
 
 secrets:
-  mysql_root_password:
-    file: ../secrets/mysql_root_password
   mysql_database:
     file: ../secrets/mysql_database
   mysql_user:
     file: ../secrets/mysql_user
+  mysql_root_password:
+    file: ../secrets/mysql_root_password
   mysql_password:
     file: ../secrets/mysql_password
   wp_admin_password:
@@ -78,13 +76,13 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: ${DATA_PATH}/mariadb
+      device: ${HOME}/data/mariadb
   wordpress_data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ${DATA_PATH}/wordpress
+      device: ${HOME}/data/wordpress
 
 networks:
   inception_network:

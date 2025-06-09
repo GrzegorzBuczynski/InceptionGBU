@@ -5,7 +5,7 @@ SHELL := /bin/bash
 
 # variable
 ENV_FILE = srcs/.env
-ENV_VARS = DOMAIN_NAME WP_ADMIN_USER WP_ADMIN_EMAIL WP_USER WP_USER_EMAIL DATA_PATH
+ENV_VARS = DOMAIN_NAME WP_ADMIN_USER WP_ADMIN_EMAIL WP_USER WP_USER_EMAIL
 SECRETS = mysql_database mysql_password mysql_root_password mysql_user wp_admin_password wp_user_password
 
 # Default target
@@ -30,6 +30,7 @@ clean: down
 
 # Clean everything including data
 fclean: clean
+	-docker volume rm srcs_mariadb_data srcs_wordpress_data 2>/dev/null || true
 	sudo rm -rf /home/${USER}/data
 
 # Rebuild everything from scratch
@@ -38,6 +39,7 @@ re: fclean all
 # More aggressive cleaning
 purge: down
 	docker system prune -af --volumes
+	-docker volume rm srcs_mariadb_data srcs_wordpress_data 2>/dev/null || true
 	sudo rm -rf /home/${USER}/data
 	docker network prune -f
 	-docker rmi srcs_mariadb srcs_wordpress srcs_nginx 2>/dev/null || true

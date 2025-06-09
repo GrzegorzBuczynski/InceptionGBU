@@ -34,7 +34,7 @@ export WORDPRESS_DB_USER=$(cat /run/secrets/mysql_user)
 export WORDPRESS_DB_PASSWORD=$(cat /run/secrets/mysql_password)
 export WP_ADMIN_PASSWORD=$(cat /run/secrets/wp_admin_password)
 export WP_USER_PASSWORD=$(cat /run/secrets/wp_user_password)
-export WORDPRESS_DB_HOST="mariadb:3306" # Explicitly add port for clarity
+export WORDPRESS_DB_HOST="mariadb" # Explicitly add port for clarity
 
 log "Database credentials loaded from secrets."
 
@@ -42,11 +42,12 @@ log "Database credentials loaded from secrets."
 if [ ! -f "/var/www/html/wp-config.php" ]; then
     log "wp-config.php not found. Starting first-time installation..."
 
-    # --- Step 3a: Download WordPress and WP-CLI ---
-    log "Downloading WordPress core..."
-    curl -o latest.tar.gz https://wordpress.org/latest.tar.gz
-    tar -xzf latest.tar.gz --strip-components=1 # Extract directly to current directory
-    rm latest.tar.gz
+   # --- Step 3a: Copy WordPress core only if not present ---
+    if [ ! -f "/var/www/html/wp-load.php" ]; then
+        log "Copying WordPress core to volume..."
+        cp -R /tmp/wordpress/* /var/www/html/
+        log "WordPress core copied."
+    fi
 
     log "Downloading WP-CLI..."
     curl -o wp-cli.phar https://github.com/wp-cli/wp-cli/releases/download/v2.10.0/wp-cli-2.10.0.phar
@@ -79,6 +80,12 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
     done
     log "MariaDB is ready! Connection successful."
 
+
+    log "Connecting to DB with:"
+    log "DB_HOST=$WORDPRESS_DB_HOST"
+    log "DB_NAME=$WORDPRESS_DB_NAME"
+    log "DB_USER=$WORDPRESS_DB_USER"
+    log "DB_PASS=$WORDPRESS_DB_PASSWORD"
     # --- Step 3c: Create wp-config.php ---
     log "Creating wp-config.php file..."
     wp config create \
