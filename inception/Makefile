@@ -5,14 +5,14 @@ SHELL := /bin/bash
 
 # variable
 ENV_FILE = srcs/.env
-ENV_VARS = DOMAIN_NAME WP_ADMIN WP_ADMIN_EMAIL WP_USER WP_USER_EMAIL
+ENV_VARS = DOMAIN_NAME WP_ADMIN WP_ADMIN_EMAIL WP_USER WP_USER_EMAIL SITE_TITLE
 SECRETS = mysql_database mysql_user mysql_password mysql_root_password wp_admin_password wp_user_password
 
 # Default target
 all: up
 
 # Start containers with all checks
-up: init-all
+up: init-all nginx_conf
 	@echo Create data directories on the host
 	mkdir -p /home/${USER}/data/mariadb
 	mkdir -p /home/${USER}/data/wordpress
@@ -137,6 +137,13 @@ init-secrets:
 # Create both
 init-all: init-env init-secrets
 	@echo "🎉 All configuration ready!"
+
+nginx_conf:
+	@echo "creating nginx.conf"
+	@DOMAIN_NAME=$$(grep ^DOMAIN_NAME= srcs/.env | cut -d '=' -f2) ; \
+	SAFE_DOMAIN_NAME=$$(printf '%s\n' "$$DOMAIN_NAME" | sed 's/[\/&]/\\&/g') ; \
+	sed "s/login\.42\.fr/$$SAFE_DOMAIN_NAME/" srcs/requirements/nginx/conf/nginx.conf.template > srcs/requirements/nginx/conf/nginx.conf
+
 
 
 # Declare phony targets to avoid conflicts with file names
