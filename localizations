@@ -3,5 +3,6 @@
 /run/secrets
 /run
 /usr/local/bin/docker-entrypoint.sh
+/usr/local/bin/wordpress-setup.sh 
 
 docker cp srcs/requirements/wordpress/tools/wordpress-setup.sh wordpress:/usr/local/bin/

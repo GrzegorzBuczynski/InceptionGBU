@@ -14,13 +14,13 @@ ST = State
 L  = City
 O  = Organization
 OU = OrgUnit
-CN = gbuczyns.42.fr
+CN = DOMAIN_NAME
 
 [ req_ext ]
 subjectAltName = @alt_names
 
 [ alt_names ]
-DNS.1 = gbuczyns.42.fr
+DNS.1 = DOMAIN_NAME
 IP.1  = 192.168.1.100
 EOF
 

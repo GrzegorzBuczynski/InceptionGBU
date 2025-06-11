@@ -51,6 +51,9 @@ logs:
 logs-db:
 	docker-compose -f srcs/docker-compose.yml logs -f mariadb
 
+logs-ng:
+	docker-compose -f srcs/docker-compose.yml logs nginx
+
 # -f stays for with follow mode
 logs-wp:
 	docker-compose -f srcs/docker-compose.yml logs -f wordpress
@@ -79,6 +82,9 @@ conect_wordpress_container:
 
 update_wordpress_sh:
 	docker cp srcs/requirements/wordpress/tools/wordpress-setup.sh wordpress:/usr/local/bin/
+
+update_nginx.conf:
+	docker cp srcs/requirements/nginx/conf/nginx.conf nginx:/etc/nginx/
 
 # List docker volumes
 volumes:
@@ -143,7 +149,10 @@ nginx_conf:
 	@DOMAIN_NAME=$$(grep ^DOMAIN_NAME= srcs/.env | cut -d '=' -f2) ; \
 	SAFE_DOMAIN_NAME=$$(printf '%s\n' "$$DOMAIN_NAME" | sed 's/[\/&]/\\&/g') ; \
 	sed "s/login\.42\.fr/$$SAFE_DOMAIN_NAME/" srcs/requirements/nginx/conf/nginx.conf.template > srcs/requirements/nginx/conf/nginx.conf
-
+# @echo "creating tools/nginx-setup.sh"
+# @DOMAIN_NAME=$$(grep ^DOMAIN_NAME= srcs/.env | cut -d '=' -f2) ; \
+# SAFE_DOMAIN_NAME=$$(printf '%s\n' "$$DOMAIN_NAME" | sed 's/[\/&]/\\&/g') ; \
+# sed "s/DOMAIN_NAME/$$SAFE_DOMAIN_NAME/" srcs/requirements/nginx/tools/nginx-setup.template.sh > srcs/requirements/nginx/tools/nginx-setup.sh
 
 
 # Declare phony targets to avoid conflicts with file names

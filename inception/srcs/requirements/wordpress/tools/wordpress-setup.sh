@@ -69,17 +69,20 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
             --skip-check \
             --allow-root
 
-        # Forcing domain and https
-        echo "define('WP_HOME', 'https://${DOMAIN_NAME}');" >> wp-config.php
-        echo "define('WP_SITEURL', 'https://${DOMAIN_NAME}');" >> wp-config.php
+        # # Forcing domain and https
+        # echo "define('WP_HOME', 'https://${DOMAIN_NAME}');" >> wp-config.php
+        # echo "define('WP_SITEURL', 'https://${DOMAIN_NAME}');" >> wp-config.php
 
         # opcional alternative aproach
-        #         // w wp-config.php
-        # if (isset($_SERVER['HTTP_HOST'])) {
-        #     define('WP_HOME', 'http://' . $_SERVER['HTTP_HOST']);
-        #     define('WP_SITEURL', 'http://' . $_SERVER['HTTP_HOST']);
-        # }
+        #         wp-config.php
+        echo "if (isset(\$_SERVER['HTTP_HOST'])) {" >> wp-config.php
+        echo "  \$protocol = (!empty(\$_SERVER['HTTPS']) && \$_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';" >> wp-config.php
+        echo "  define('WP_HOME', \$protocol . \$_SERVER['HTTP_HOST']);" >> wp-config.php
+        echo "  define('WP_SITEURL', \$protocol . \$_SERVER['HTTP_HOST']);" >> wp-config.php
+        echo "}" >> wp-config.php
+
     fi
+    echo "error_log('HTTP_HOST: ' . \$_SERVER['HTTP_HOST']);"  >> wp-config.php
 
     log "Waiting on database $WORDPRESS_DB_HOST..."
     until wp db check --allow-root > /dev/null 2>&1; do
@@ -106,6 +109,12 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
 else
     log "wp-config.php already exists. Skipping installation."
 fi
+
+wp option update siteurl "https://gbuczyns.42.fr" --allow-root
+wp option update home "https://gbuczyns.42.fr" --allow-root
+
+wp rewrite flush --allow-root
+wp search-replace 'https://gbuczyns.42.fr' 'https://192.168.1.100' --all-tables --allow-root
 
 log "Starting PHP-FPM service..."
 # Execute the main container command (CMD from Dockerfile)
