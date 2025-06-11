@@ -5,8 +5,8 @@ SHELL := /bin/bash
 
 # variable
 ENV_FILE = srcs/.env
-ENV_VARS = DOMAIN_NAME WP_ADMIN_USER WP_ADMIN_EMAIL WP_USER WP_USER_EMAIL
-SECRETS = mysql_database mysql_password mysql_root_password mysql_user wp_admin_password wp_user_password
+ENV_VARS = DOMAIN_NAME WP_ADMIN WP_ADMIN_EMAIL WP_USER WP_USER_EMAIL
+SECRETS = mysql_database mysql_user mysql_password mysql_root_password wp_admin_password wp_user_password
 
 # Default target
 all: up
@@ -76,6 +76,9 @@ conect_mariadb_container:
 
 conect_wordpress_container:
 	docker exec -it wordpress bash
+
+update_wordpress_sh:
+	docker cp srcs/requirements/wordpress/tools/wordpress-setup.sh wordpress:/usr/local/bin/
 
 # List docker volumes
 volumes:

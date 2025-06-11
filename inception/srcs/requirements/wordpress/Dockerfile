@@ -17,19 +17,24 @@ RUN apt-get update && apt-get install -y \
     mariadb-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Skopiuj konfigurację PHP-FPM
+RUN wget https://wordpress.org/latest.tar.gz -O /tmp/wordpress.tar.gz && \
+   tar -xzf /tmp/wordpress.tar.gz -C /tmp/ && \
+   rm /tmp/wordpress.tar.gz && \
+   chown -R www-data:www-data /tmp/wordpress  
+
+# Copy PHP-FPM configuration
 COPY conf/www.conf /etc/php/7.4/fpm/pool.d/www.conf
 
-# Skopiuj i ustaw uprawnienia dla skryptu setup
+# Copy and set permissions for setup script
 COPY tools/wordpress-setup.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/wordpress-setup.sh
 
-# Utwórz katalog roboczy
+# Create working directory
 WORKDIR /var/www/html
 
-# Eksponuj port PHP-FPM
+# Expose PHP-FPM port
 EXPOSE 9000
 
-# Uruchom skrypt setup i PHP-FPM
+# Run setup script and PHP-FPM
 ENTRYPOINT ["/usr/local/bin/wordpress-setup.sh"]
 CMD ["php-fpm7.4", "-F"]

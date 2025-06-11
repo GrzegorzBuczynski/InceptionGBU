@@ -1,0 +1,7 @@
+
+/var/www/html
+/run/secrets
+/run
+/usr/local/bin/docker-entrypoint.sh
+
+docker cp srcs/requirements/wordpress/tools/wordpress-setup.sh wordpress:/usr/local/bin/
