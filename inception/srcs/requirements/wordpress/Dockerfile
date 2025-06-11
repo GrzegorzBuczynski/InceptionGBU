@@ -17,10 +17,10 @@ RUN apt-get update && apt-get install -y \
     mariadb-client \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget https://wordpress.org/latest.tar.gz -O /tmp/wordpress.tar.gz && \
-   tar -xzf /tmp/wordpress.tar.gz -C /tmp/ && \
-   rm /tmp/wordpress.tar.gz && \
-   chown -R www-data:www-data /tmp/wordpress  
+RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && \
+    chmod +x wp-cli.phar && \
+    mv wp-cli.phar /usr/local/bin/wp
+    #\ # chown -R www-data:www-data /tmp/wordpress  
 
 # Copy PHP-FPM configuration
 COPY conf/www.conf /etc/php/7.4/fpm/pool.d/www.conf

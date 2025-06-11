@@ -41,12 +41,6 @@ log "Database credentials loaded from secrets."
 if [ ! -f "/var/www/html/wp-config.php" ]; then
     log "wp-config.php not found. Starting first-time installation..."
 
-   # Copy WordPress core only if not present ---
-    if [ ! -f "/var/www/html/wp-load.php" ]; then
-        log "Copying WordPress core to volume..."
-        cp -R /tmp/wordpress/* /var/www/html/
-        log "WordPress core copied."
-    fi
 
     if ! command -v wp &> /dev/null; then
         log "Downloading WP-CLI..."
@@ -58,14 +52,15 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
         log "wp-cli already installed"
     fi
 
-    log "Waiting on database $WORDPRESS_DB_HOST..."
-    until wp db check --allow-root > /dev/null 2>&1; do
-        sleep 2
-    done
+    if [ ! -f "/var/www/html/wp-load.php" ]; then
+        log "Downloading WordPress core..."
+        wp core download --path=/var/www/html --allow-root
+        log "WordPress core downloaded to /var/www/html"
+    fi
 
     # Creating wp-config.php
     if [ ! -f wp-config.php ]; then
-        echo "Tworzę wp-config.php..."
+        echo "Creating wp-config.php..."
         wp config create \
             --dbname="$WORDPRESS_DB_NAME" \
             --dbuser="$MYSQL_DB_USER" \
@@ -77,8 +72,19 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
         # Forcing domain and https
         echo "define('WP_HOME', 'https://${DOMAIN_NAME}');" >> wp-config.php
         echo "define('WP_SITEURL', 'https://${DOMAIN_NAME}');" >> wp-config.php
+
+        # opcional alternative aproach
+        #         // w wp-config.php
+        # if (isset($_SERVER['HTTP_HOST'])) {
+        #     define('WP_HOME', 'http://' . $_SERVER['HTTP_HOST']);
+        #     define('WP_SITEURL', 'http://' . $_SERVER['HTTP_HOST']);
+        # }
     fi
 
+    log "Waiting on database $WORDPRESS_DB_HOST..."
+    until wp db check --allow-root > /dev/null 2>&1; do
+        sleep 2
+    done
     # Install WordPress
     if ! wp core is-installed --allow-root; then
         echo "Instaluję WordPress..."
