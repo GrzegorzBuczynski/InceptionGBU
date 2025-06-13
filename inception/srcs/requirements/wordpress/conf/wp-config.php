@@ -1,6 +1,3 @@
-make conect_wordpress_container 
-docker exec -it wordpress bash
-root@db848334e454:/var/www/html# cat wp-config.php 
 <?php
 /**
  * The base configuration for WordPress
@@ -52,15 +49,15 @@ define( 'DB_COLLATE', '' );
  *
  * @since 2.6.0
  */
-define( 'AUTH_KEY',          ' ~YQ[Uyh{h`;~?.K=w.ES0-y/`*5ew}?@|~@&S`_WGHy0W~U}yj^5sTtWz[R0!?a' );
-define( 'SECURE_AUTH_KEY',   '3k97/WZV7@reOuQ6ZYnqw1UbTJU]EQKt_2gyj+]jjNJ!nS$1KQ?3-OWa,Jf(pqY+' );
-define( 'LOGGED_IN_KEY',     '<_!h^(_3~/^B //:{ida,]%a$reF]3Co+wXu,4L4w<fLup. 1?|hLLc tC>8@rD^' );
-define( 'NONCE_KEY',         'd;8iO=,aga[%YL@Lw9/!77+Dd.uA6zBv*Hs@e-_pOzTmG@ lD+$(|8Le{r)LrM>F' );
-define( 'AUTH_SALT',         't>UpEZ0&SPuw#IgW,Er8nB.Iz:t|w}r<hEcV-Q|LSZ7LQzV|4S.,$2!Kze8?gGU[' );
-define( 'SECURE_AUTH_SALT',  ' R|2AN|OyWyL(HLVwm|aQD[mx%xh2&NsOn#BA3p@xOE0%OneTb~fik%JuF0aZra4' );
-define( 'LOGGED_IN_SALT',    'Q%&UFz%xmF{ho+8CIdp+gPbh_|J+G~kC:Vm_&dXmhYIx3}W7XFLA?*Rhz7Y};)5S' );
-define( 'NONCE_SALT',        '1%Hfb<j7o1rwZ!8&e<lpDd={F(~nAe[oBr>fx%cF^lipnxIH-X_!!zCguRA3GE[5' );
-define( 'WP_CACHE_KEY_SALT', ',7pT{aW!)gH_Ed{~5gmbRZa<LnM_+1)3F.d ]{qV$~n2-.f._BIg(u_xGUX*M9^S' );
+define( 'AUTH_KEY',          'h@zxv18Ed,nCB#v_@U;k0$^A./vI9uXcjAGN2J9&h!;v@196O]B!.uqZm]0_TIMO' );
+define( 'SECURE_AUTH_KEY',   '[INDyRpb^u(#s`+Wn5J 9kcROsE7%Ohfs3a~k~nlvk!P6^@,_sPe4T7j()8L^7{g' );
+define( 'LOGGED_IN_KEY',     'X6C:_)rX#yr*cidPKR/X$<}cN(d0M{Pzs@Q(]?4{]SWbf )9&8-96dN(e;{C.<%>' );
+define( 'NONCE_KEY',         'Yysn`m0_]@T6KM=H,oZV]ODk$3{RE0.GXdmR}!@QP)5MOK{]D6p?9^-kNy^:ZnBb' );
+define( 'AUTH_SALT',         '# n?E|;oMNKZ)tG]vgD*&P`t]dN4n@xxK21X/mM0[aCS3hl=uFkJ[v@u1v$yN%/R' );
+define( 'SECURE_AUTH_SALT',  '|F-Xiw~Gv6RM?6x4c1>O e;=ed#5yS2*G/BWL2Wg)/bDd:.c6},#oM7;wswA[&vv' );
+define( 'LOGGED_IN_SALT',    '~$P]R$<T7OnW/0!QXun2,k_n/Dp Y,]x&yHgt/e@PxF24,9_l95F3ANTzBG,,.Uq' );
+define( 'NONCE_SALT',        ':SdJL3bj3b?ivd]kdL=MVhiN9Fw[Wa>0G&hxbb2@NQkEE}jr:A FTvu @s3x@^;x' );
+define( 'WP_CACHE_KEY_SALT', 'LV#&JVlb^n/4d:u7@<2Q&.9HW9b.^omW?#dP`6ZZev8q.Oa96zjLds@XPfc>++Q.' );
 
 
 /**#@-*/
@@ -93,6 +90,11 @@ $table_prefix = 'wp_';
 if ( ! defined( 'WP_DEBUG' ) ) {
         define( 'WP_DEBUG', false );
 }
+        if (isset($_SERVER['HTTP_HOST'])) {
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+        define('WP_HOME', $protocol . $_SERVER['HTTP_HOST']);
+        define('WP_SITEURL', $protocol . $_SERVER['HTTP_HOST']);
+        }
 
 /* That's all, stop editing! Happy publishing. */
 
@@ -103,10 +105,4 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /** Sets up WordPress vars and included files. */
 require_once ABSPATH . 'wp-settings.php';
-if (isset($_SERVER['HTTP_HOST'])) {
-  $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-  define('WP_HOME', $protocol . $_SERVER['HTTP_HOST']);
-  define('WP_SITEURL', $protocol . $_SERVER['HTTP_HOST']);
-}
 error_log('HTTP_HOST: ' . $_SERVER['HTTP_HOST']);
-root@db848334e454:/var/www/html# 
