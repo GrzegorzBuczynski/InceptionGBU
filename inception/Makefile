@@ -12,7 +12,7 @@ SECRETS = mysql_database mysql_user mysql_password mysql_root_password wp_admin_
 all: up
 
 # Start containers with all checks
-up: init-all nginx_conf
+up: init-all nginx_conf iptables
 	@echo Create data directories on the host
 	mkdir -p /home/${USER}/data/mariadb
 	mkdir -p /home/${USER}/data/wordpress
@@ -153,6 +153,25 @@ nginx_conf:
 # @DOMAIN_NAME=$$(grep ^DOMAIN_NAME= srcs/.env | cut -d '=' -f2) ; \
 # SAFE_DOMAIN_NAME=$$(printf '%s\n' "$$DOMAIN_NAME" | sed 's/[\/&]/\\&/g') ; \
 # sed "s/DOMAIN_NAME/$$SAFE_DOMAIN_NAME/" srcs/requirements/nginx/tools/nginx-setup.template.sh > srcs/requirements/nginx/tools/nginx-setup.sh
+
+iptables:
+	sudo iptables -P INPUT ACCEPT
+	sudo iptables -P FORWARD ACCEPT
+	sudo iptables -P OUTPUT ACCEPT
+	sudo iptables -A INPUT -i lo -j ACCEPT
+	sudo iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+	sudo iptables -A INPUT -i docker0 -p tcp --dport 443 -j ACCEPT
+	sudo iptables -A INPUT -i docker0 -j DROP
+# sudo iptables -F
+# sudo iptables -X
+
+
+iptables_save:
+	sudo apt install iptables-persistent
+	sudo netfilter-persistent save
+
+iptables_check:
+	sudo iptables -L -n -v
 
 
 # Declare phony targets to avoid conflicts with file names

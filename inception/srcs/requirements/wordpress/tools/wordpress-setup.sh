@@ -89,3 +89,6 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
 else
     log "wp-config.php already exists. Skipping installation."
 fi
+
+
+exec "$@"
